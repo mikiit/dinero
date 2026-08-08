@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "@/lib/database.types";
 
 /**
  * Converts the current anonymous session into a real account by attaching
@@ -8,7 +9,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
  * needed (SPEC.md Phase 4).
  */
 export async function upgradeAnonymousAccount(
-  supabase: SupabaseClient,
+  supabase: SupabaseClient<Database>,
   email: string,
   password: string,
 ) {

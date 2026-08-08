@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "@/lib/database.types";
 import { DEFAULT_CATEGORIES } from "./default-categories";
 
 /**
@@ -7,7 +8,7 @@ import { DEFAULT_CATEGORIES } from "./default-categories";
  * (first-run bootstrap, re-seeding a wiped dev database, etc.).
  */
 export async function seedDefaultCategories(
-  supabase: SupabaseClient,
+  supabase: SupabaseClient<Database>,
   userId: string,
 ) {
   const { data: existing, error: fetchError } = await supabase

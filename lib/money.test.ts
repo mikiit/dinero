@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatRSD, fromMinor, toMinor } from "./money";
+import { formatRSD, fromDbAmount, fromMinor, toDbAmount, toMinor } from "./money";
 
 describe("toMinor", () => {
   it("parses a plain integer as whole units", () => {
@@ -76,5 +76,53 @@ describe("formatRSD", () => {
 
   it("formats negative amounts (credit card owed)", () => {
     expect(formatRSD(-2450000n)).toBe("-24.500,00 RSD");
+  });
+});
+
+describe("toDbAmount", () => {
+  it("converts bigint minor units to number", () => {
+    expect(toDbAmount(123456n)).toBe(123456);
+  });
+
+  it("preserves sign", () => {
+    expect(toDbAmount(-2450000n)).toBe(-2450000);
+  });
+
+  it("handles zero", () => {
+    expect(toDbAmount(0n)).toBe(0);
+  });
+
+  it("accepts the boundary of the safe integer range", () => {
+    const max = BigInt(Number.MAX_SAFE_INTEGER);
+    expect(toDbAmount(max)).toBe(Number.MAX_SAFE_INTEGER);
+    expect(toDbAmount(-max)).toBe(-Number.MAX_SAFE_INTEGER);
+  });
+
+  it("throws beyond the safe integer range", () => {
+    const tooBig = BigInt(Number.MAX_SAFE_INTEGER) + 1n;
+    expect(() => toDbAmount(tooBig)).toThrow();
+    expect(() => toDbAmount(-tooBig)).toThrow();
+  });
+});
+
+describe("fromDbAmount", () => {
+  it("converts a number read from the DB to bigint", () => {
+    expect(fromDbAmount(123456)).toBe(123456n);
+  });
+
+  it("preserves sign", () => {
+    expect(fromDbAmount(-2450000)).toBe(-2450000n);
+  });
+
+  it("handles zero", () => {
+    expect(fromDbAmount(0)).toBe(0n);
+  });
+
+  it("throws on a non-integer value", () => {
+    expect(() => fromDbAmount(12.5)).toThrow();
+  });
+
+  it("round-trips through toDbAmount", () => {
+    expect(fromDbAmount(toDbAmount(987654321n))).toBe(987654321n);
   });
 });

@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { describe, expect, it, vi } from "vitest";
+import type { Database } from "@/lib/database.types";
 import { upgradeAnonymousAccount } from "./upgrade-anonymous-account";
 
 function mockClient(result: {
@@ -10,7 +11,7 @@ function mockClient(result: {
     auth: {
       updateUser: vi.fn().mockResolvedValue(result),
     },
-  } as unknown as SupabaseClient;
+  } as unknown as SupabaseClient<Database>;
 }
 
 describe("upgradeAnonymousAccount", () => {
