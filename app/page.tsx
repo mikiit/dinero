@@ -7,7 +7,6 @@ import { NetWorthCard } from "@/components/home/net-worth-card";
 import { AccountStrip } from "@/components/home/account-strip";
 import { MonthSummary } from "@/components/home/month-summary";
 import { RecentTransactionsList } from "@/components/home/recent-transactions-list";
-import { FloatingAddButton } from "@/components/home/floating-add-button";
 
 export default async function HomePage() {
   const supabase = await createClient();
@@ -36,7 +35,7 @@ export default async function HomePage() {
     ]);
 
   return (
-    <main className="mx-auto max-w-md space-y-6 p-4 pb-24">
+    <main className="mx-auto max-w-md space-y-6 p-4">
       <NetWorthCard accounts={accounts} />
       <AccountStrip accounts={accounts} />
       <MonthSummary
@@ -51,7 +50,6 @@ export default async function HomePage() {
           categories={categories}
         />
       </div>
-      <FloatingAddButton accounts={accounts} categories={categories} />
     </main>
   );
 }
