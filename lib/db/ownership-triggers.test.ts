@@ -1,8 +1,7 @@
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { Database } from "@/lib/database.types";
+import { loadTestEnv } from "./test-env";
 
 // Integration test against the LIVE linked Supabase project — the ownership
 // trigger (supabase/migrations/20260804190008_add_ownership_triggers.sql)
@@ -13,27 +12,7 @@ import type { Database } from "@/lib/database.types";
 //
 // Skips (rather than fails) when .env.local isn't present, so `npm test`
 // still works on a machine without project credentials configured.
-function loadEnvLocal(): Record<string, string> {
-  try {
-    const raw = readFileSync(resolve(process.cwd(), ".env.local"), "utf8");
-    const env: Record<string, string> = {};
-    for (const line of raw.split(/\r?\n/)) {
-      const match = /^([A-Z0-9_]+)=(.*)$/.exec(line.trim());
-      if (match) {
-        env[match[1]] = match[2];
-      }
-    }
-    return env;
-  } catch {
-    return {};
-  }
-}
-
-const env = { ...loadEnvLocal(), ...process.env };
-const url = env.NEXT_PUBLIC_SUPABASE_URL;
-const anonKey = env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-const secretKey = env.SUPABASE_SECRET_KEY;
-const hasCredentials = Boolean(url && anonKey && secretKey);
+const { url, anonKey, secretKey, hasCredentials } = loadTestEnv();
 
 describe.skipIf(!hasCredentials)("ownership triggers (live)", () => {
   let admin: SupabaseClient<Database>;

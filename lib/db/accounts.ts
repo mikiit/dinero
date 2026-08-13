@@ -34,9 +34,11 @@ export type CreateAccountInput = {
   icon?: string | null;
 };
 
+/** type and currency are immutable after creation (also enforced by a DB
+ * trigger - see supabase/migrations/*_lock_account_type_and_currency.sql) -
+ * neither is settable here. */
 export type UpdateAccountInput = {
   name?: string;
-  type?: AccountType;
   creditLimit?: bigint | null;
   statementDay?: number | null;
   dueDay?: number | null;
@@ -129,7 +131,6 @@ export async function updateAccount(
 ): Promise<void> {
   const patch: Database["public"]["Tables"]["accounts"]["Update"] = {};
   if (input.name !== undefined) patch.name = input.name;
-  if (input.type !== undefined) patch.type = input.type;
   if (input.creditLimit !== undefined) {
     patch.credit_limit =
       input.creditLimit == null ? null : toDbAmount(input.creditLimit);

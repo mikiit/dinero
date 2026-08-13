@@ -111,11 +111,14 @@ export async function updateAccountAction(
       throw new Error("Missing account id.");
     }
 
+    // type can't be changed after creation (DB trigger enforces this too) -
+    // this is the account's existing type, carried through a hidden field
+    // purely to decide whether the credit-only fields below apply. It is
+    // never written back.
     const type = parseAccountType(formData.get("type"));
 
     await updateAccount(supabase, user.id, accountId, {
       name: parseRequiredName(formData.get("name")),
-      type,
       creditLimit:
         type === "credit" ? parseOptionalMoney(formData.get("creditLimit")) : null,
       statementDay:

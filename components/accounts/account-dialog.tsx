@@ -99,22 +99,36 @@ export function AccountDialog({ account }: { account?: Account }) {
 
           <div className="space-y-1.5">
             <Label htmlFor="type">Type</Label>
-            <Select
-              name="type"
-              value={type}
-              onValueChange={(value) => setType(value as AccountType)}
-            >
-              <SelectTrigger id="type" className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {ACCOUNT_TYPES.map((t) => (
-                  <SelectItem key={t} value={t}>
-                    {ACCOUNT_TYPE_LABELS[t]}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            {isEdit ? (
+              <>
+                {/* Immutable after creation (also enforced by a DB trigger) -
+                    carried through as a hidden field so the action can still
+                    tell whether the credit-only fields below apply. */}
+                <input type="hidden" name="type" value={type} />
+                <p className="text-sm text-muted-foreground">
+                  {ACCOUNT_TYPE_LABELS[type]}
+                </p>
+              </>
+            ) : (
+              <Select
+                name="type"
+                value={type}
+                onValueChange={(value) => setType(value as AccountType)}
+              >
+                <SelectTrigger id="type" className="w-full">
+                  <SelectValue>
+                    {(value: AccountType) => ACCOUNT_TYPE_LABELS[value]}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {ACCOUNT_TYPES.map((t) => (
+                    <SelectItem key={t} value={t}>
+                      {ACCOUNT_TYPE_LABELS[t]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
           </div>
 
           {!isEdit && (
