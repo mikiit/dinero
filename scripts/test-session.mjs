@@ -5,8 +5,12 @@
 // never touch your actual accounts/categories/transactions.
 //
 // Usage:
-//   node scripts/test-session.mjs setup      -> prints {userId, accessToken, refreshToken}
-//   node scripts/test-session.mjs teardown <userId>  -> deletes that user and all their rows
+//   node scripts/test-session.mjs setup                    -> minimal: one account, no transactions
+//   node scripts/test-session.mjs setup --seed-transactions -> two accounts, five categories, 30
+//                                                                transactions across 6 days, plus
+//                                                                the independently-computed expected
+//                                                                day total / account balances
+//   node scripts/test-session.mjs teardown <userId>         -> deletes that user and all their rows
 //
 // See app/api/dev/test-session/route.ts for how the printed tokens get
 // into an actual browser tab.
@@ -34,7 +38,35 @@ if (!url || !anonKey || !secretKey) {
   process.exit(1);
 }
 
-async function setup() {
+// Fixed, non-random template applied identically to each of the 6 seeded
+// days, so every day's total is the same number and easy to eyeball in
+// the UI, and the final account balances are round enough to hand-check.
+// All amounts are minor units (para).
+const CHECKING_OPENING = 1_000_000; // 10,000.00 RSD
+const SAVINGS_OPENING = 500_000; // 5,000.00 RSD
+const DAY_TEMPLATE = [
+  { type: "expense", category: "Groceries", account: "checking", amount: 100_000 }, // 1,000.00
+  { type: "expense", category: "Transport", account: "checking", amount: 30_000 }, // 300.00
+  { type: "expense", category: "Eating out", account: "checking", amount: 55_075, note: "Team lunch" }, // 550.75
+  { type: "income", category: "Salary", account: "checking", amount: 500_000 }, // 5,000.00
+  { type: "expense", category: "Groceries", account: "savings", amount: 20_000 }, // 200.00
+];
+const SEED_DAYS = 6;
+
+const CATEGORIES = [
+  { name: "Groceries", kind: "expense" },
+  { name: "Transport", kind: "expense" },
+  { name: "Eating out", kind: "expense" },
+  { name: "Salary", kind: "income" },
+];
+
+function isoDaysAgo(n) {
+  const d = new Date();
+  d.setDate(d.getDate() - n);
+  return d.toISOString().slice(0, 10);
+}
+
+async function setup(seedTransactions) {
   const client = createClient(url, anonKey);
 
   const { data, error } = await client.auth.signInAnonymously();
@@ -43,20 +75,120 @@ async function setup() {
   }
   const userId = data.user.id;
 
-  const { error: accountError } = await client.from("accounts").insert({
-    user_id: userId,
-    name: "Test Wallet",
-    type: "cash",
-    opening_balance: 1000000, // 10,000.00 RSD - enough headroom for test expenses
-  });
-  if (accountError) throw accountError;
+  if (!seedTransactions) {
+    const { error: accountError } = await client.from("accounts").insert({
+      user_id: userId,
+      name: "Test Wallet",
+      type: "cash",
+      opening_balance: 1_000_000,
+    });
+    if (accountError) throw accountError;
+
+    console.log(
+      JSON.stringify({
+        userId,
+        accessToken: data.session.access_token,
+        refreshToken: data.session.refresh_token,
+      }),
+    );
+    return;
+  }
+
+  const { data: checking, error: checkingError } = await client
+    .from("accounts")
+    .insert({
+      user_id: userId,
+      name: "Test Checking",
+      type: "cash",
+      opening_balance: CHECKING_OPENING,
+    })
+    .select()
+    .single();
+  if (checkingError) throw checkingError;
+
+  const { data: savings, error: savingsError } = await client
+    .from("accounts")
+    .insert({
+      user_id: userId,
+      name: "Test Savings",
+      type: "savings",
+      opening_balance: SAVINGS_OPENING,
+    })
+    .select()
+    .single();
+  if (savingsError) throw savingsError;
+
+  const accountIdByKey = { checking: checking.id, savings: savings.id };
+
+  const categoryIdByName = {};
+  for (const c of CATEGORIES) {
+    const { data: cat, error: catError } = await client
+      .from("categories")
+      .insert({ user_id: userId, name: c.name, kind: c.kind })
+      .select()
+      .single();
+    if (catError) throw catError;
+    categoryIdByName[c.name] = cat.id;
+  }
+
+  const rows = [];
+  for (let dayOffset = 0; dayOffset < SEED_DAYS; dayOffset++) {
+    const occurredOn = isoDaysAgo(dayOffset);
+    for (const tx of DAY_TEMPLATE) {
+      rows.push({
+        user_id: userId,
+        type: tx.type,
+        account_id: accountIdByKey[tx.account],
+        category_id: categoryIdByName[tx.category],
+        amount: tx.amount,
+        currency: "RSD",
+        occurred_on: occurredOn,
+        note: tx.note ?? null,
+      });
+    }
+  }
+
+  const { error: txError } = await client.from("transactions").insert(rows);
+  if (txError) throw txError;
+
+  const checkingDayNet = DAY_TEMPLATE.filter((t) => t.account === "checking").reduce(
+    (sum, t) => sum + (t.type === "income" ? t.amount : -t.amount),
+    0,
+  );
+  const savingsDayNet = DAY_TEMPLATE.filter((t) => t.account === "savings").reduce(
+    (sum, t) => sum + (t.type === "income" ? t.amount : -t.amount),
+    0,
+  );
+  const dayTotalMinor = checkingDayNet + savingsDayNet;
 
   console.log(
-    JSON.stringify({
-      userId,
-      accessToken: data.session.access_token,
-      refreshToken: data.session.refresh_token,
-    }),
+    JSON.stringify(
+      {
+        userId,
+        accessToken: data.session.access_token,
+        refreshToken: data.session.refresh_token,
+        accountIds: accountIdByKey,
+        categoryIds: categoryIdByName,
+        transactionCount: rows.length,
+        seedDays: Array.from({ length: SEED_DAYS }, (_, i) => isoDaysAgo(i)),
+        expected: {
+          dayTotalMinor,
+          dayTotalRSD: (dayTotalMinor / 100).toFixed(2),
+          checkingBalanceMinor: CHECKING_OPENING + checkingDayNet * SEED_DAYS,
+          checkingBalanceRSD: (
+            (CHECKING_OPENING + checkingDayNet * SEED_DAYS) /
+            100
+          ).toFixed(2),
+          savingsBalanceMinor: SAVINGS_OPENING + savingsDayNet * SEED_DAYS,
+          savingsBalanceRSD: (
+            (SAVINGS_OPENING + savingsDayNet * SEED_DAYS) /
+            100
+          ).toFixed(2),
+        },
+      },
+      null,
+      2,
+    ),
   );
 }
 
@@ -80,13 +212,15 @@ async function teardown(userId) {
   console.log(JSON.stringify({ ok: true, userId }));
 }
 
-const [, , command, arg] = process.argv;
+const [, , command, ...rest] = process.argv;
 
 if (command === "setup") {
-  await setup();
+  await setup(rest.includes("--seed-transactions"));
 } else if (command === "teardown") {
-  await teardown(arg);
+  await teardown(rest[0]);
 } else {
-  console.error("Usage: node scripts/test-session.mjs <setup|teardown> [userId]");
+  console.error(
+    "Usage: node scripts/test-session.mjs <setup [--seed-transactions]|teardown> [userId]",
+  );
   process.exit(1);
 }
