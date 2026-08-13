@@ -1,4 +1,8 @@
-import { formatRSD } from "@/lib/money";
+import { Amount } from "@/components/ui/amount";
+import {
+  TransactionTypeIcon,
+  transactionAmountTone,
+} from "@/components/transactions/transaction-type-icon";
 import type { Account } from "@/lib/db/accounts";
 import type { Category } from "@/lib/db/categories";
 import type { Transaction } from "@/lib/db/transactions";
@@ -49,18 +53,15 @@ export function RecentTransactionsList({
                 </span>
               </span>
             </div>
-            <span
-              className={
-                "shrink-0 text-sm font-medium tabular-nums " +
-                (isIncome
-                  ? "text-emerald-600 dark:text-emerald-400"
-                  : isExpense
-                    ? "text-destructive"
-                    : "")
-              }
-            >
-              {isIncome ? "+" : ""}
-              {formatRSD(signedAmount)}
+            <span className="flex shrink-0 items-center gap-1.5">
+              <TransactionTypeIcon type={t.type} />
+              <Amount
+                value={signedAmount}
+                size="md"
+                tone={transactionAmountTone(t.type)}
+                showSign={isIncome || t.type === "adjustment"}
+                showUnit={false}
+              />
             </span>
           </li>
         );

@@ -1,4 +1,4 @@
-import { formatRSD } from "@/lib/money";
+import { Amount } from "@/components/ui/amount";
 import type { Account } from "@/lib/db/accounts";
 
 export function NetWorthCard({ accounts }: { accounts: Account[] }) {
@@ -9,7 +9,11 @@ export function NetWorthCard({ accounts }: { accounts: Account[] }) {
   return (
     <div className="space-y-1">
       <p className="text-sm text-muted-foreground">Net worth</p>
-      <p className="text-3xl font-semibold tabular-nums">{formatRSD(netWorth)}</p>
+      <Amount
+        value={netWorth}
+        size="hero"
+        tone={netWorth < 0n ? "expense" : "neutral"}
+      />
     </div>
   );
 }

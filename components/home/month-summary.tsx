@@ -1,4 +1,4 @@
-import { formatRSD } from "@/lib/money";
+import { Amount } from "@/components/ui/amount";
 
 export function MonthSummary({
   income,
@@ -13,19 +13,20 @@ export function MonthSummary({
     <div className="grid grid-cols-3 gap-2 rounded-lg border p-3 text-center">
       <div>
         <p className="text-xs text-muted-foreground">Income</p>
-        <p className="text-sm font-medium tabular-nums text-emerald-600 dark:text-emerald-400">
-          {formatRSD(income)}
-        </p>
+        <Amount value={income} size="sm" tone="income" showUnit={false} />
       </div>
       <div>
         <p className="text-xs text-muted-foreground">Expense</p>
-        <p className="text-sm font-medium tabular-nums text-destructive">
-          {formatRSD(expense)}
-        </p>
+        <Amount value={expense} size="sm" tone="expense" showUnit={false} />
       </div>
       <div>
         <p className="text-xs text-muted-foreground">Net</p>
-        <p className="text-sm font-medium tabular-nums">{formatRSD(net)}</p>
+        <Amount
+          value={net}
+          size="sm"
+          tone={net < 0n ? "expense" : "income"}
+          showUnit={false}
+        />
       </div>
     </div>
   );

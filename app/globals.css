@@ -2,6 +2,49 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
+/*
+ * DESIGN TOKENS - the source of truth for palette, type scale, and spacing.
+ * See components/ui/amount.tsx for the primitive that applies the type
+ * scale + color tokens below to every money value in the app.
+ *
+ * PALETTE
+ *   Neutral base + --primary stay the existing shadcn grayscale (already
+ *   off-black/off-white, already one visual language everywhere - no
+ *   reason to touch what isn't broken).
+ *   Three semantic colors carry ALL data meaning in this app, nothing else:
+ *     --expense   red    (money leaving; equals --destructive on purpose)
+ *     --income    green
+ *     --transfer  blue
+ *   Matched lightness/chroma across all three (see :root below) so hue is
+ *   the only thing distinguishing them - no color reads more "important"
+ *   than another. --muted-foreground is the fourth, deliberately-quiet
+ *   state for adjustments (neither spending nor earning).
+ *
+ * TYPE SCALE
+ *   Reuses Tailwind's built-in scale (text-xs..text-4xl) rather than a
+ *   parallel set of custom sizes - it's already systematic. What's
+ *   tokenized here is which ROLE maps to which step, applied via shared
+ *   components so it can't drift screen-to-screen:
+ *     Page title       text-xl font-medium        (font-heading)
+ *     Section label     text-sm font-medium
+ *     Body / list rows  text-sm
+ *     Caption / meta    text-xs text-muted-foreground
+ *     Amount: hero       text-3xl font-bold    - one per screen, e.g. net worth
+ *     Amount: primary    text-base font-semibold - list rows, account cards
+ *     Amount: secondary  text-sm font-semibold   - dense multi-amount rows
+ *   Amounts are always tabular-nums and always render 3-4 steps bolder/
+ *   larger than the label next to them - that gap IS the "amounts are the
+ *   most legible element" rule, not a one-off style choice.
+ *
+ * SPACING
+ *   Tailwind's default 4px-based scale, applied with a fixed rhythm:
+ *     Page padding        p-4
+ *     Section gap          space-y-6
+ *     Card padding          p-3 (dense lists) / p-4 (standalone cards)
+ *     Inline icon/text gap   gap-2
+ *     Row internal gap        gap-3
+ */
+
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
@@ -27,6 +70,12 @@
   --color-input: var(--input);
   --color-border: var(--border);
   --color-destructive: var(--destructive);
+  --color-expense: var(--expense);
+  --color-expense-subtle: var(--expense-subtle);
+  --color-income: var(--income);
+  --color-income-subtle: var(--income-subtle);
+  --color-transfer: var(--transfer);
+  --color-transfer-subtle: var(--transfer-subtle);
   --color-accent-foreground: var(--accent-foreground);
   --color-accent: var(--accent);
   --color-muted-foreground: var(--muted-foreground);
@@ -64,6 +113,18 @@
   --accent: oklch(0.97 0 0);
   --accent-foreground: oklch(0.205 0 0);
   --destructive: oklch(0.577 0.245 27.325);
+  /* Transaction-type semantic colors. Matched lightness (~0.58-0.6) and
+     chroma across all three so none reads "louder" than the others at a
+     glance - hue alone carries the distinction. Expense intentionally
+     shares --destructive's exact value: both are "subtractive" semantics
+     (money leaving, a row being deleted), so keeping them equal is
+     coherent rather than two competing accents - see 4.2's color lock. */
+  --expense: oklch(0.577 0.245 27.325);
+  --expense-subtle: oklch(0.577 0.245 27.325 / 0.12);
+  --income: oklch(0.6 0.14 155);
+  --income-subtle: oklch(0.6 0.14 155 / 0.12);
+  --transfer: oklch(0.55 0.19 258);
+  --transfer-subtle: oklch(0.55 0.19 258 / 0.12);
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
   --ring: oklch(0.708 0 0);
@@ -99,6 +160,12 @@
   --accent: oklch(0.269 0 0);
   --accent-foreground: oklch(0.985 0 0);
   --destructive: oklch(0.704 0.191 22.216);
+  --expense: oklch(0.704 0.191 22.216);
+  --expense-subtle: oklch(0.704 0.191 22.216 / 0.16);
+  --income: oklch(0.72 0.15 155);
+  --income-subtle: oklch(0.72 0.15 155 / 0.16);
+  --transfer: oklch(0.72 0.15 258);
+  --transfer-subtle: oklch(0.72 0.15 258 / 0.16);
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
   --ring: oklch(0.556 0 0);

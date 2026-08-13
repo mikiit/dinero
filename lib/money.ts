@@ -72,6 +72,29 @@ export function formatRSD(minor: bigint): string {
   return RSD_FORMATTER.format(fromMinor(minor));
 }
 
+/**
+ * Splits a formatted RSD amount into its number and currency-unit parts
+ * (e.g. "1.234,56" and "RSD"), for display contexts where the number needs
+ * to be the dominant visual element and the unit should read smaller and
+ * de-emphasized rather than inheriting the number's size - see
+ * components/ui/amount.tsx. Uses Intl's own part boundaries rather than
+ * string-splitting formatRSD's output, so it stays correct if this ever
+ * formats a currency other than RSD.
+ */
+export function formatRSDParts(minor: bigint): { number: string; unit: string } {
+  const parts = RSD_FORMATTER.formatToParts(fromMinor(minor));
+  let number = "";
+  let unit = "RSD";
+  for (const part of parts) {
+    if (part.type === "currency") {
+      unit = part.value;
+    } else if (part.type !== "literal") {
+      number += part.value;
+    }
+  }
+  return { number, unit };
+}
+
 // --- DB boundary -----------------------------------------------------------
 // Postgres `bigint` columns (opening_balance, credit_limit, amount, and the
 // account_balances.balance view) have no JSON representation, so

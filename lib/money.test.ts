@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatRSD, fromDbAmount, fromMinor, toDbAmount, toDecimalString, toMinor } from "./money";
+import { formatRSD, formatRSDParts, fromDbAmount, fromMinor, toDbAmount, toDecimalString, toMinor } from "./money";
 
 describe("toMinor", () => {
   it("parses a plain integer as whole units", () => {
@@ -151,5 +151,29 @@ describe("toDecimalString", () => {
   it("round-trips through toMinor", () => {
     expect(toMinor(toDecimalString(987654n))).toBe(987654n);
     expect(toMinor(toDecimalString(-987654n))).toBe(-987654n);
+  });
+});
+
+describe("formatRSDParts", () => {
+  it("splits a positive amount into number and unit", () => {
+    expect(formatRSDParts(123456n)).toEqual({ number: "1.234,56", unit: "RSD" });
+  });
+
+  it("keeps the minus sign on the number part, not the unit", () => {
+    expect(formatRSDParts(-123456n)).toEqual({ number: "-1.234,56", unit: "RSD" });
+  });
+
+  it("formats zero", () => {
+    expect(formatRSDParts(0n)).toEqual({ number: "0,00", unit: "RSD" });
+  });
+
+  it("handles large amounts without losing grouping", () => {
+    expect(formatRSDParts(20000000n)).toEqual({ number: "200.000,00", unit: "RSD" });
+  });
+
+  it("the number part alone round-trips through toMinor", () => {
+    const { number } = formatRSDParts(987654321n);
+    const plain = number.replace(/\./g, "").replace(",", ".");
+    expect(toMinor(plain)).toBe(987654321n);
   });
 });
