@@ -118,7 +118,26 @@ async function setup(seedTransactions) {
     .single();
   if (savingsError) throw savingsError;
 
-  const accountIdByKey = { checking: checking.id, savings: savings.id };
+  // Negative opening_balance = owed, per the credit card balance
+  // convention (lib/credit.ts). No transactions are seeded against it -
+  // its only purpose is exercising the "Owed: X" + utilization bar
+  // display and the set-balance-via-adjustment flow against a real limit.
+  const CREDIT_LIMIT = 200_000; // 2,000.00 RSD
+  const CREDIT_OPENING = -80_000; // owes 800.00 RSD -> 40% utilization
+  const { data: credit, error: creditError } = await client
+    .from("accounts")
+    .insert({
+      user_id: userId,
+      name: "Test Credit Card",
+      type: "credit",
+      opening_balance: CREDIT_OPENING,
+      credit_limit: CREDIT_LIMIT,
+    })
+    .select()
+    .single();
+  if (creditError) throw creditError;
+
+  const accountIdByKey = { checking: checking.id, savings: savings.id, credit: credit.id };
 
   const categoryIdByName = {};
   for (const c of CATEGORIES) {
@@ -184,6 +203,10 @@ async function setup(seedTransactions) {
             (SAVINGS_OPENING + savingsDayNet * SEED_DAYS) /
             100
           ).toFixed(2),
+          creditBalanceMinor: CREDIT_OPENING,
+          creditOwedRSD: (-CREDIT_OPENING / 100).toFixed(2),
+          creditLimitRSD: (CREDIT_LIMIT / 100).toFixed(2),
+          creditUtilizationPercent: (-CREDIT_OPENING / CREDIT_LIMIT) * 100,
         },
       },
       null,

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatRSD, fromDbAmount, fromMinor, toDbAmount, toMinor } from "./money";
+import { formatRSD, fromDbAmount, fromMinor, toDbAmount, toDecimalString, toMinor } from "./money";
 
 describe("toMinor", () => {
   it("parses a plain integer as whole units", () => {
@@ -124,5 +124,32 @@ describe("fromDbAmount", () => {
 
   it("round-trips through toDbAmount", () => {
     expect(fromDbAmount(toDbAmount(987654321n))).toBe(987654321n);
+  });
+});
+
+describe("toDecimalString", () => {
+  it("converts positive minor units to a decimal string", () => {
+    expect(toDecimalString(123456n)).toBe("1234.56");
+  });
+
+  it("converts negative minor units, preserving the sign", () => {
+    expect(toDecimalString(-123456n)).toBe("-1234.56");
+  });
+
+  it("preserves the sign for a magnitude under 1.00", () => {
+    expect(toDecimalString(-75n)).toBe("-0.75");
+  });
+
+  it("handles zero", () => {
+    expect(toDecimalString(0n)).toBe("0.00");
+  });
+
+  it("pads a single-digit fraction", () => {
+    expect(toDecimalString(105n)).toBe("1.05");
+  });
+
+  it("round-trips through toMinor", () => {
+    expect(toMinor(toDecimalString(987654n))).toBe(987654n);
+    expect(toMinor(toDecimalString(-987654n))).toBe(-987654n);
   });
 });

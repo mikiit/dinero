@@ -1,4 +1,4 @@
-export type Json =
+﻿export type Json =
   | string
   | number
   | boolean
@@ -347,6 +347,15 @@ export type Database = {
         Row: {
           account_id: string | null
           balance: number | null
+          user_id: string | null
+        }
+        Relationships: []
+      }
+      monthly_summary: {
+        Row: {
+          expense: number | null
+          income: number | null
+          month: string | null
           user_id: string | null
         }
         Relationships: []

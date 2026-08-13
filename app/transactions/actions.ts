@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import {
   createTransaction,
+  getMonthlySummary,
+  listRecentTransactions,
   listTransactionsPage,
   restoreTransaction,
   softDeleteTransaction,
@@ -113,6 +115,7 @@ export async function createTransactionAction(
 
   // The account's balance (shown on /accounts) just changed.
   revalidatePath("/accounts");
+  revalidatePath("/");
   return {};
 }
 
@@ -145,6 +148,7 @@ export async function updateTransactionAction(
   }
 
   revalidatePath("/accounts");
+  revalidatePath("/");
   return {};
 }
 
@@ -167,6 +171,7 @@ export async function deleteTransactionAction(
   }
 
   revalidatePath("/accounts");
+  revalidatePath("/");
   return {};
 }
 
@@ -188,5 +193,37 @@ export async function restoreTransactionAction(
   }
 
   revalidatePath("/accounts");
+  revalidatePath("/");
   return {};
+}
+
+export async function listRecentTransactionsAction(
+  limit = 10,
+): Promise<TransactionListItem[]> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return [];
+
+  const transactions = await listRecentTransactions(supabase, user.id, limit);
+  return transactions.map((t) => ({ ...t, amount: t.amount.toString() }));
+}
+
+export type MonthlySummaryResult = { income: string; expense: string };
+
+export async function getMonthlySummaryAction(
+  monthIso: string,
+): Promise<MonthlySummaryResult> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { income: "0", expense: "0" };
+
+  const summary = await getMonthlySummary(supabase, user.id, monthIso);
+  return {
+    income: summary.income.toString(),
+    expense: summary.expense.toString(),
+  };
 }

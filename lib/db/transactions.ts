@@ -350,3 +350,97 @@ export async function restoreTransaction(
 
   if (error) throw error;
 }
+
+/**
+ * Plain, unpaginated "most recent N" fetch for the Home dashboard. Doesn't
+ * use listTransactionsPage's day-boundary top-up - that machinery exists
+ * to keep the Transactions list's day groups/totals complete, which
+ * doesn't apply here (Home shows a flat list, not day groups), and would
+ * make "last 10" sometimes return more than 10.
+ */
+export async function listRecentTransactions(
+  supabase: SupabaseClient<Database>,
+  userId: string,
+  limit = 10,
+): Promise<Transaction[]> {
+  const { data, error } = await supabase
+    .from("transactions")
+    .select("*")
+    .eq("user_id", userId)
+    .is("deleted_at", null)
+    .order("occurred_on", { ascending: false })
+    .order("created_at", { ascending: false })
+    .order("id", { ascending: false })
+    .limit(limit);
+
+  if (error) throw error;
+  return (data ?? []).map(toTransaction);
+}
+
+export type MonthlySummary = {
+  income: bigint;
+  expense: bigint;
+};
+
+/**
+ * This month's income/expense totals for the Home dashboard, from the
+ * monthly_summary view - a SQL aggregate, not a sum of raw rows in
+ * TypeScript (CLAUDE.md rule 2). monthIso is the first of the target
+ * month, e.g. "2026-08-01".
+ */
+export async function getMonthlySummary(
+  supabase: SupabaseClient<Database>,
+  userId: string,
+  monthIso: string,
+): Promise<MonthlySummary> {
+  const { data, error } = await supabase
+    .from("monthly_summary")
+    .select("income, expense")
+    .eq("user_id", userId)
+    .eq("month", monthIso)
+    .maybeSingle();
+
+  if (error) throw error;
+
+  return {
+    income: fromDbAmount(data?.income ?? 0),
+    expense: fromDbAmount(data?.expense ?? 0),
+  };
+}
+
+/**
+ * Writes a single signed adjustment transaction for "Set current balance" -
+ * never touches opening_balance (CLAUDE.md rule 2: balances are derived,
+ * never overwritten). delta is target - current derived balance, computed
+ * by the caller from account_balances; a delta of exactly zero is the
+ * caller's responsibility to skip (the amount_sign_matches_type CHECK
+ * constraint also rejects a zero-amount adjustment as a backstop).
+ */
+export async function createAdjustment(
+  supabase: SupabaseClient<Database>,
+  userId: string,
+  accountId: string,
+  delta: bigint,
+  occurredOn: string,
+): Promise<void> {
+  const { data: account, error: accountError } = await supabase
+    .from("accounts")
+    .select("currency")
+    .eq("id", accountId)
+    .eq("user_id", userId)
+    .single();
+
+  if (accountError) throw accountError;
+
+  const { error } = await supabase.from("transactions").insert({
+    user_id: userId,
+    type: "adjustment",
+    account_id: accountId,
+    category_id: null,
+    amount: toDbAmount(delta),
+    currency: account.currency,
+    occurred_on: occurredOn,
+  });
+
+  if (error) throw error;
+}

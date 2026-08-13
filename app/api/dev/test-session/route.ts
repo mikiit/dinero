@@ -10,7 +10,7 @@ import { createClient } from "@/lib/supabase/server";
 // even in dev, since `next dev` binds to the LAN address, not just
 // localhost - without the secret this would let anyone on the network
 // hijack a browser's session to any account they choose.
-export async function POST(request: Request) {
+function checkAuth(request: Request): Response | null {
   if (process.env.NODE_ENV === "production") {
     return new Response("Not found", { status: 404 });
   }
@@ -23,6 +23,38 @@ export async function POST(request: Request) {
   if (request.headers.get("x-test-session-secret") !== expectedSecret) {
     return new Response("Not found", { status: 404 });
   }
+
+  return null;
+}
+
+// Reads whatever session is currently in the browser's cookies, so it can
+// be captured and restored after swapping in a disposable test session -
+// browser automation tooling can't read these cookies directly (they're
+// not exposed to page JS), so this is the only way to round-trip them.
+export async function GET(request: Request) {
+  const authError = checkAuth(request);
+  if (authError) return authError;
+
+  const supabase = await createClient();
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+
+  if (!session) {
+    return Response.json({ session: null });
+  }
+
+  return Response.json({
+    session: {
+      access_token: session.access_token,
+      refresh_token: session.refresh_token,
+    },
+  });
+}
+
+export async function POST(request: Request) {
+  const authError = checkAuth(request);
+  if (authError) return authError;
 
   const body = await request.json();
   const { access_token, refresh_token } = body ?? {};

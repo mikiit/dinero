@@ -10,7 +10,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
-import { toMinor } from "@/lib/money";
+import { toDecimalString, toMinor } from "@/lib/money";
 import type { Account } from "@/lib/db/accounts";
 import type { Category } from "@/lib/db/categories";
 import {
@@ -32,20 +32,6 @@ function toFormState(transaction: TransactionListItem): TransactionFormState {
   };
 }
 
-/** Editing form fields work in decimal major units (what a person types),
- * but TransactionListItem.amount is minor units. Converts once on open.
- * Takes the sign off before dividing - bigint division truncates toward
- * zero, so e.g. -75n / 100n is 0n, which would otherwise silently drop
- * the minus sign for any magnitude under 1.00. */
-function minorStringToDecimal(minor: string): string {
-  const value = BigInt(minor);
-  const sign = value < 0n ? "-" : "";
-  const abs = value < 0n ? -value : value;
-  const whole = abs / 100n;
-  const fraction = abs % 100n;
-  return `${sign}${whole}.${fraction.toString().padStart(2, "0")}`;
-}
-
 function EditTransactionForm({
   transaction,
   accounts,
@@ -61,7 +47,7 @@ function EditTransactionForm({
 }) {
   const [form, setForm] = useState<TransactionFormState>(() => ({
     ...toFormState(transaction),
-    amount: minorStringToDecimal(transaction.amount),
+    amount: toDecimalString(BigInt(transaction.amount)),
   }));
   const [formError, setFormError] = useState<string | null>(null);
 

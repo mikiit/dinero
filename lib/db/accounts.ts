@@ -101,6 +101,28 @@ export async function listAccounts(
   );
 }
 
+/**
+ * Fetches one account's current derived balance fresh - used right before
+ * writing a "set current balance" adjustment, since the delta must be
+ * computed against the true current balance at write time, not whatever
+ * the client last saw when the page loaded.
+ */
+export async function getAccountBalance(
+  supabase: SupabaseClient<Database>,
+  userId: string,
+  accountId: string,
+): Promise<bigint> {
+  const { data, error } = await supabase
+    .from("account_balances")
+    .select("balance")
+    .eq("user_id", userId)
+    .eq("account_id", accountId)
+    .maybeSingle();
+
+  if (error) throw error;
+  return fromDbAmount(data?.balance ?? 0);
+}
+
 export async function createAccount(
   supabase: SupabaseClient<Database>,
   userId: string,

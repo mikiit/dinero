@@ -41,10 +41,15 @@ export function AddTransactionSheet({
   accounts,
   categories,
   onBackgroundError,
+  trigger,
 }: {
   accounts: Account[];
   categories: Category[];
   onBackgroundError: (message: string) => void;
+  /** Defaults to a plain "Add transaction" button - pass a differently
+   * styled element (e.g. a floating action button) to change the trigger
+   * without duplicating the sheet/form logic. */
+  trigger?: React.ReactElement;
 }) {
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState<TransactionFormState>(() =>
@@ -118,7 +123,9 @@ export function AddTransactionSheet({
         if (next) setFormError(null);
       }}
     >
-      <SheetTrigger render={<Button size="lg" />}>Add transaction</SheetTrigger>
+      <SheetTrigger render={trigger ?? <Button size="lg" />}>
+        {trigger ? undefined : "Add transaction"}
+      </SheetTrigger>
       <SheetContent side="bottom">
         <SheetHeader>
           <SheetTitle>Add transaction</SheetTitle>

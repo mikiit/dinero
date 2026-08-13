@@ -1,13 +1,16 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { format } from "date-fns";
 import { createClient } from "@/lib/supabase/server";
 import {
   archiveAccount,
   createAccount,
+  getAccountBalance,
   updateAccount,
   type AccountType,
 } from "@/lib/db/accounts";
+import { createAdjustment } from "@/lib/db/transactions";
 import { toMinor } from "@/lib/money";
 
 export type AccountFormState =
@@ -149,4 +152,60 @@ export async function archiveAccountAction(formData: FormData): Promise<void> {
 
   await archiveAccount(supabase, user.id, accountId);
   revalidatePath("/accounts");
+}
+
+export type SetAccountBalanceResult = {
+  error?: string;
+  /** True when the target already matched the current balance - nothing
+   * was written (an adjustment of exactly zero is also rejected by the
+   * amount_sign_matches_type CHECK constraint, so this check avoids
+   * hitting the DB at all for the expected no-op case). */
+  noChange?: boolean;
+};
+
+/**
+ * "Set current balance": writes a single signed adjustment transaction for
+ * the difference between the target and the *current derived* balance -
+ * never touches opening_balance (CLAUDE.md rule 2). targetBalance must
+ * already be correctly signed by the caller (e.g. the UI negates a credit
+ * card's "Owed" input before sending, since the account's true balance
+ * convention is negative = owed).
+ */
+export async function setAccountBalanceAction(input: {
+  accountId: string;
+  targetBalance: string;
+}): Promise<SetAccountBalanceResult> {
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return { error: "Not signed in." };
+
+    if (!input.accountId) return { error: "Missing account." };
+
+    const target = toMinor(input.targetBalance);
+    const current = await getAccountBalance(supabase, user.id, input.accountId);
+    const delta = target - current;
+
+    if (delta === 0n) {
+      return { noChange: true };
+    }
+
+    await createAdjustment(
+      supabase,
+      user.id,
+      input.accountId,
+      delta,
+      format(new Date(), "yyyy-MM-dd"),
+    );
+  } catch (err) {
+    return {
+      error: err instanceof Error ? err.message : "Failed to set balance.",
+    };
+  }
+
+  revalidatePath("/accounts");
+  revalidatePath("/");
+  return {};
 }

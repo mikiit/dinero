@@ -1,8 +1,10 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatRSD } from "@/lib/money";
+import { utilizationPercent } from "@/lib/credit";
 import type { Account } from "@/lib/db/accounts";
 import { AccountDialog } from "@/components/accounts/account-dialog";
 import { ArchiveAccountButton } from "@/components/accounts/archive-account-button";
+import { SetBalanceDialog } from "@/components/accounts/set-balance-dialog";
 
 const ACCOUNT_TYPE_LABELS: Record<Account["type"], string> = {
   cash: "Cash",
@@ -22,43 +24,64 @@ export function AccountList({ accounts }: { accounts: Account[] }) {
 
   return (
     <ul className="space-y-3">
-      {accounts.map((account) => (
-        <li key={account.id}>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between gap-4">
-              <div>
-                <CardTitle>{account.name}</CardTitle>
-                <p className="text-sm text-muted-foreground">
-                  {ACCOUNT_TYPE_LABELS[account.type]}
-                </p>
-              </div>
-              <div className="text-right">
-                <p className="text-lg font-medium tabular-nums">
-                  {formatRSD(account.balance)}
-                </p>
-                {account.type === "credit" && account.creditLimit != null && (
-                  <p className="text-xs text-muted-foreground">
-                    Limit {formatRSD(account.creditLimit)}
+      {accounts.map((account) => {
+        const isCredit = account.type === "credit";
+
+        return (
+          <li key={account.id}>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between gap-4">
+                <div>
+                  <CardTitle>{account.name}</CardTitle>
+                  <p className="text-sm text-muted-foreground">
+                    {ACCOUNT_TYPE_LABELS[account.type]}
                   </p>
-                )}
-              </div>
-            </CardHeader>
-            {account.type === "credit" &&
-              (account.statementDay != null || account.dueDay != null) && (
-                <CardContent className="flex gap-4 text-xs text-muted-foreground">
-                  {account.statementDay != null && (
-                    <span>Statement day {account.statementDay}</span>
+                </div>
+                <div className="text-right">
+                  <p className="text-lg font-medium tabular-nums">
+                    {isCredit
+                      ? `Owed: ${formatRSD(-account.balance)}`
+                      : formatRSD(account.balance)}
+                  </p>
+                  {isCredit && account.creditLimit != null && (
+                    <p className="text-xs text-muted-foreground">
+                      Limit {formatRSD(account.creditLimit)}
+                    </p>
                   )}
-                  {account.dueDay != null && <span>Due day {account.dueDay}</span>}
+                </div>
+              </CardHeader>
+              {isCredit && account.creditLimit != null && account.creditLimit > 0n && (
+                <CardContent className="pt-0">
+                  <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                    <div
+                      className="h-full rounded-full bg-destructive"
+                      style={{
+                        width: `${utilizationPercent(account.balance, account.creditLimit)}%`,
+                      }}
+                    />
+                  </div>
                 </CardContent>
               )}
-            <CardContent className="flex justify-end gap-2 pt-0">
-              <AccountDialog account={account} />
-              <ArchiveAccountButton accountId={account.id} />
-            </CardContent>
-          </Card>
-        </li>
-      ))}
+              {isCredit &&
+                (account.statementDay != null || account.dueDay != null) && (
+                  <CardContent className="flex gap-4 pt-0 text-xs text-muted-foreground">
+                    {account.statementDay != null && (
+                      <span>Statement day {account.statementDay}</span>
+                    )}
+                    {account.dueDay != null && (
+                      <span>Due day {account.dueDay}</span>
+                    )}
+                  </CardContent>
+                )}
+              <CardContent className="flex flex-wrap justify-end gap-2 pt-0">
+                <SetBalanceDialog account={account} />
+                <AccountDialog account={account} />
+                <ArchiveAccountButton accountId={account.id} />
+              </CardContent>
+            </Card>
+          </li>
+        );
+      })}
     </ul>
   );
 }

@@ -43,6 +43,23 @@ export function fromMinor(minor: bigint): number {
   return Number(whole) + Number(fraction) / Number(MINOR_UNITS_PER_MAJOR);
 }
 
+/**
+ * Converts bigint minor units to a plain decimal string ("1234.56" /
+ * "-75.00"), suitable for pre-filling an editable text input that will
+ * itself be parsed back through `toMinor` - unlike `formatRSD`, no
+ * thousands separators or currency symbol. Takes the sign off before
+ * dividing: bigint division truncates toward zero, so e.g. -75n / 100n is
+ * 0n, which would otherwise silently drop the minus sign for any
+ * magnitude under 1.00.
+ */
+export function toDecimalString(minor: bigint): string {
+  const sign = minor < 0n ? "-" : "";
+  const abs = minor < 0n ? -minor : minor;
+  const whole = abs / MINOR_UNITS_PER_MAJOR;
+  const fraction = abs % MINOR_UNITS_PER_MAJOR;
+  return `${sign}${whole}.${fraction.toString().padStart(2, "0")}`;
+}
+
 const RSD_FORMATTER = new Intl.NumberFormat("sr-RS", {
   style: "currency",
   currency: "RSD",
