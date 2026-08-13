@@ -13,7 +13,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { formatRSD, toDecimalString, toMinor } from "@/lib/money";
+import { Amount } from "@/components/ui/amount";
+import { toDecimalString, toMinor } from "@/lib/money";
 import type { Account } from "@/lib/db/accounts";
 import { setAccountBalanceAction } from "@/app/accounts/actions";
 
@@ -110,15 +111,31 @@ export function SetBalanceDialog({ account }: { account: Account }) {
                 Already at this balance — no change needed.
               </p>
             ) : (
-              <div className="space-y-1 rounded-lg bg-muted p-3 text-sm">
-                <p>Current: {formatRSD(displayedCurrent)}</p>
-                <p>
-                  New: {formatRSD(isCredit ? -parsedTarget : parsedTarget)}
+              <div className="space-y-1.5 rounded-lg bg-muted p-3 text-sm">
+                <p className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Current</span>
+                  <Amount value={displayedCurrent} size="sm" tone="neutral" />
                 </p>
-                <p className="font-medium">
-                  Adjustment:{" "}
-                  {(isCredit ? -delta : delta) > 0n ? "+" : ""}
-                  {formatRSD(isCredit ? -delta : delta)}
+                <p className="flex items-center justify-between">
+                  <span className="text-muted-foreground">New</span>
+                  <Amount
+                    value={isCredit ? -parsedTarget : parsedTarget}
+                    size="sm"
+                    tone="neutral"
+                  />
+                </p>
+                <p className="flex items-center justify-between font-medium">
+                  <span>Adjustment</span>
+                  <Amount
+                    value={isCredit ? -delta : delta}
+                    size="sm"
+                    // Tone reflects whether the account's true balance
+                    // improves (delta > 0), not the displayed sign - for a
+                    // credit card, Owed going DOWN is good news even
+                    // though it's shown as a negative adjustment here.
+                    tone={delta > 0n ? "income" : "expense"}
+                    showSign
+                  />
                 </p>
               </div>
             ))}

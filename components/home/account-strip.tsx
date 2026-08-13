@@ -50,12 +50,7 @@ export function AccountStrip({ accounts }: { accounts: Account[] }) {
                     </div>
                     <p className="text-xs text-muted-foreground">
                       Limit{" "}
-                      <Amount
-                        value={account.creditLimit}
-                        size="sm"
-                        tone="muted"
-                        className="text-xs"
-                      />
+                      <Amount value={account.creditLimit} size="sm" tone="muted" />
                     </p>
                   </div>
                 )}

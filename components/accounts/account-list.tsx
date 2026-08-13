@@ -1,5 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { formatRSD } from "@/lib/money";
+import { Amount } from "@/components/ui/amount";
 import { utilizationPercent } from "@/lib/credit";
 import type { Account } from "@/lib/db/accounts";
 import { AccountDialog } from "@/components/accounts/account-dialog";
@@ -26,26 +26,35 @@ export function AccountList({ accounts }: { accounts: Account[] }) {
     <ul className="space-y-3">
       {accounts.map((account) => {
         const isCredit = account.type === "credit";
+        const owed = isCredit ? -account.balance : 0n;
 
         return (
           <li key={account.id}>
             <Card>
               <CardHeader className="flex flex-row items-center justify-between gap-4">
-                <div>
-                  <CardTitle>{account.name}</CardTitle>
+                <div className="min-w-0">
+                  <CardTitle className="truncate">{account.name}</CardTitle>
                   <p className="text-sm text-muted-foreground">
                     {ACCOUNT_TYPE_LABELS[account.type]}
                   </p>
                 </div>
-                <div className="text-right">
-                  <p className="text-lg font-medium tabular-nums">
-                    {isCredit
-                      ? `Owed: ${formatRSD(-account.balance)}`
-                      : formatRSD(account.balance)}
-                  </p>
+                <div className="shrink-0 text-right">
+                  {isCredit ? (
+                    <>
+                      <p className="text-xs text-muted-foreground">Owed</p>
+                      <Amount
+                        value={owed}
+                        size="lg"
+                        tone={owed > 0n ? "expense" : "neutral"}
+                      />
+                    </>
+                  ) : (
+                    <Amount value={account.balance} size="lg" />
+                  )}
                   {isCredit && account.creditLimit != null && (
                     <p className="text-xs text-muted-foreground">
-                      Limit {formatRSD(account.creditLimit)}
+                      Limit{" "}
+                      <Amount value={account.creditLimit} size="sm" tone="muted" />
                     </p>
                   )}
                 </div>
@@ -54,7 +63,7 @@ export function AccountList({ accounts }: { accounts: Account[] }) {
                 <CardContent className="pt-0">
                   <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
                     <div
-                      className="h-full rounded-full bg-destructive"
+                      className="h-full rounded-full bg-expense"
                       style={{
                         width: `${utilizationPercent(account.balance, account.creditLimit)}%`,
                       }}

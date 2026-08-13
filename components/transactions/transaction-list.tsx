@@ -4,7 +4,12 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { format, parseISO } from "date-fns";
 import { Button } from "@/components/ui/button";
-import { formatRSD, toMinor } from "@/lib/money";
+import { Amount } from "@/components/ui/amount";
+import {
+  TransactionTypeIcon,
+  transactionAmountTone,
+} from "@/components/transactions/transaction-type-icon";
+import { toMinor } from "@/lib/money";
 import type { Account } from "@/lib/db/accounts";
 import type { Category } from "@/lib/db/categories";
 import type { TransactionFilters, TransactionsCursor } from "@/lib/db/transactions";
@@ -294,13 +299,18 @@ function TransactionListResults({
       )}
 
       <div className="space-y-6">
-        {dayGroups.map((group) => (
+        {dayGroups.map((group) => {
+          const total = dayTotal(group.transactions);
+          return (
           <div key={group.date}>
             <div className="mb-2 flex items-baseline justify-between">
               <h2 className="text-sm font-medium">{dayLabel(group.date)}</h2>
-              <span className="text-sm tabular-nums text-muted-foreground">
-                {formatRSD(dayTotal(group.transactions))}
-              </span>
+              <Amount
+                value={total}
+                size="sm"
+                tone={total < 0n ? "expense" : "income"}
+                showUnit={false}
+              />
             </div>
             <ul className="divide-y rounded-lg border">
               {group.transactions.map((t) => {
@@ -348,18 +358,15 @@ function TransactionListResults({
                         </span>
                       </button>
                       <div className="flex shrink-0 items-center gap-2">
-                        <span
-                          className={
-                            "text-sm font-medium tabular-nums " +
-                            (isIncome
-                              ? "text-emerald-600 dark:text-emerald-400"
-                              : isExpense
-                                ? "text-destructive"
-                                : "")
-                          }
-                        >
-                          {isIncome ? "+" : ""}
-                          {formatRSD(signedAmount)}
+                        <span className="flex items-center gap-1.5">
+                          <TransactionTypeIcon type={t.type} />
+                          <Amount
+                            value={signedAmount}
+                            size="md"
+                            tone={transactionAmountTone(t.type)}
+                            showSign={isIncome || t.type === "adjustment"}
+                            showUnit={false}
+                          />
                         </span>
                         <Button
                           type="button"
@@ -388,7 +395,8 @@ function TransactionListResults({
               })}
             </ul>
           </div>
-        ))}
+          );
+        })}
       </div>
 
       <div ref={sentinelRef} />
