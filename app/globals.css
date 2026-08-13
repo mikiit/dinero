@@ -8,10 +8,14 @@
  * scale + color tokens below to every money value in the app.
  *
  * PALETTE
- *   Neutral base + --primary stay the existing shadcn grayscale (already
- *   off-black/off-white, already one visual language everywhere - no
- *   reason to touch what isn't broken).
- *   Three semantic colors carry ALL data meaning in this app, nothing else:
+ *   Neutral base (grayscale) + exactly one accent (--primary, a warm
+ *   gold/amber - money-appropriate, and far enough from red/green/blue
+ *   that it never gets mistaken for a transaction-type color). The
+ *   accent carries every "this is an action" signal: default buttons,
+ *   active nav state, focus rings. Nothing else in the app's own chrome
+ *   uses color - category dot colors are user data, not part of this
+ *   system, and are exempt.
+ *   Three semantic colors carry ALL data meaning, nothing else:
  *     --expense   red    (money leaving; equals --destructive on purpose)
  *     --income    green
  *     --transfer  blue
@@ -51,7 +55,7 @@
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-sans: var(--font-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-mono: var(--font-mono);
   --font-heading: var(--font-sans);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
@@ -104,8 +108,10 @@
   --card-foreground: oklch(0.145 0 0);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
+  /* The one accent - warm gold/amber, dark text for contrast (light
+     warm hues pair poorly with white text). */
+  --primary: oklch(0.64 0.15 73);
+  --primary-foreground: oklch(0.18 0.03 60);
   --secondary: oklch(0.97 0 0);
   --secondary-foreground: oklch(0.205 0 0);
   --muted: oklch(0.97 0 0);
@@ -127,7 +133,7 @@
   --transfer-subtle: oklch(0.55 0.19 258 / 0.12);
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
+  --ring: oklch(0.64 0.15 73);
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
   --chart-3: oklch(0.439 0 0);
@@ -151,8 +157,8 @@
   --card-foreground: oklch(0.985 0 0);
   --popover: oklch(0.205 0 0);
   --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
+  --primary: oklch(0.74 0.14 73);
+  --primary-foreground: oklch(0.15 0.02 60);
   --secondary: oklch(0.269 0 0);
   --secondary-foreground: oklch(0.985 0 0);
   --muted: oklch(0.269 0 0);
@@ -168,7 +174,7 @@
   --transfer-subtle: oklch(0.72 0.15 258 / 0.16);
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
+  --ring: oklch(0.74 0.14 73);
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
   --chart-3: oklch(0.439 0 0);

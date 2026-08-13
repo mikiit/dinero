@@ -6,12 +6,16 @@ type AmountTone = "neutral" | "expense" | "income" | "transfer" | "muted";
 
 // The type scale for money, applied everywhere through this component so
 // it can't drift screen-to-screen. See app/globals.css's DESIGN TOKENS
-// comment for the full role -> scale mapping this implements.
+// comment for the full role -> scale mapping this implements. font-mono
+// (JetBrains Mono) gives every amount genuinely tabular figures - not
+// just the tabular-nums feature, actual fixed-width digits - and reads
+// as a deliberate "this is the number that matters" signal against the
+// Space Grotesk used everywhere else.
 const NUMBER_SIZE: Record<AmountSize, string> = {
-  hero: "text-3xl font-bold tracking-tight",
-  lg: "text-lg font-semibold",
-  md: "text-base font-semibold",
-  sm: "text-sm font-semibold",
+  hero: "font-mono text-3xl font-bold tracking-tight",
+  lg: "font-mono text-lg font-semibold",
+  md: "font-mono text-base font-semibold",
+  sm: "font-mono text-sm font-semibold",
 };
 
 const UNIT_SIZE: Record<AmountSize, string> = {

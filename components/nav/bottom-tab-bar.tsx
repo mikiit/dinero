@@ -68,7 +68,7 @@ export function BottomTabBar({
 
       <nav
         aria-label="Primary"
-        className="fixed inset-x-0 bottom-0 z-30 flex min-h-16 items-stretch border-t bg-background pb-[env(safe-area-inset-bottom)]"
+        className="fixed inset-x-0 bottom-0 z-30 flex min-h-16 items-stretch border-t bg-background pb-[env(safe-area-inset-bottom)] lg:hidden"
       >
         <NavLink href="/" label="Home" icon={HouseIcon} active={pathname === "/"} />
         <NavLink
@@ -87,7 +87,7 @@ export function BottomTabBar({
               <button
                 type="button"
                 aria-label="Add transaction"
-                className="-mt-6 flex size-12 items-center justify-center rounded-full bg-foreground text-background shadow-lg"
+                className="-mt-6 flex size-12 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg"
               >
                 <PlusIcon className="size-6" />
               </button>

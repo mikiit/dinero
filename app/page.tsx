@@ -3,10 +3,8 @@ import { createClient } from "@/lib/supabase/server";
 import { listAccounts } from "@/lib/db/accounts";
 import { listCategories } from "@/lib/db/categories";
 import { getMonthlySummary, listRecentTransactions } from "@/lib/db/transactions";
-import { NetWorthCard } from "@/components/home/net-worth-card";
-import { AccountStrip } from "@/components/home/account-strip";
-import { MonthSummary } from "@/components/home/month-summary";
-import { RecentTransactionsList } from "@/components/home/recent-transactions-list";
+import { MobileHome } from "@/components/home/mobile-home";
+import { DesktopHome } from "@/components/home/desktop-home";
 
 export default async function HomePage() {
   const supabase = await createClient();
@@ -35,21 +33,19 @@ export default async function HomePage() {
     ]);
 
   return (
-    <main className="mx-auto max-w-md space-y-6 p-4">
-      <NetWorthCard accounts={accounts} />
-      <AccountStrip accounts={accounts} />
-      <MonthSummary
-        income={monthlySummary.income}
-        expense={monthlySummary.expense}
+    <>
+      <MobileHome
+        accounts={accounts}
+        categories={categories}
+        recentTransactions={recentTransactions}
+        monthlySummary={monthlySummary}
       />
-      <div className="space-y-2">
-        <h2 className="text-sm font-medium">Recent transactions</h2>
-        <RecentTransactionsList
-          transactions={recentTransactions}
-          accounts={accounts}
-          categories={categories}
-        />
-      </div>
-    </main>
+      <DesktopHome
+        accounts={accounts}
+        categories={categories}
+        recentTransactions={recentTransactions}
+        monthlySummary={monthlySummary}
+      />
+    </>
   );
 }
