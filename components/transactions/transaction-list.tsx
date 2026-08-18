@@ -3,8 +3,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { format, parseISO } from "date-fns";
+import { ArrowDownIcon, ArrowUpIcon, ArrowUpDownIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Amount } from "@/components/ui/amount";
+import { cn } from "@/lib/utils";
 import {
   TransactionTypeIcon,
   transactionAmountTone,
@@ -28,6 +30,74 @@ import type { TransactionFormState } from "@/components/transactions/transaction
 type RowIssue = { message: string; retry: () => void };
 
 const UNDO_WINDOW_MS = 5000;
+
+// Desktop table sort. Applies to whatever's currently loaded, not a
+// server-side global sort - infinite scroll loads more pages under the
+// same client-side sort, so the loaded set always stays consistently
+// ordered, but "biggest expense ever" isn't guaranteed visible without
+// scrolling further first. A real global sort would mean teaching the
+// cursor-pagination in lib/db/transactions.ts a second sort key, which is
+// a backend change this pass doesn't make.
+type SortColumn = "date" | "amount";
+type SortDirection = "asc" | "desc";
+type SortState = { column: SortColumn; direction: SortDirection };
+
+function sortTransactions(
+  transactions: TransactionListItem[],
+  sort: SortState,
+): TransactionListItem[] {
+  const sorted = [...transactions].sort((a, b) => {
+    const cmp =
+      sort.column === "date"
+        ? a.occurredOn.localeCompare(b.occurredOn)
+        : compareBigint(BigInt(a.amount), BigInt(b.amount));
+    return sort.direction === "asc" ? cmp : -cmp;
+  });
+  return sorted;
+}
+
+function compareBigint(a: bigint, b: bigint): number {
+  if (a === b) return 0;
+  return a > b ? 1 : -1;
+}
+
+function SortableHeader({
+  label,
+  column,
+  sort,
+  onSort,
+  align = "left",
+}: {
+  label: string;
+  column: SortColumn;
+  sort: SortState;
+  onSort: (column: SortColumn) => void;
+  align?: "left" | "right";
+}) {
+  const active = sort.column === column;
+  const Icon = active
+    ? sort.direction === "asc"
+      ? ArrowUpIcon
+      : ArrowDownIcon
+    : ArrowUpDownIcon;
+
+  return (
+    <th className={cn("py-2 font-medium", align === "right" && "text-right")}>
+      <button
+        type="button"
+        onClick={() => onSort(column)}
+        className={cn(
+          "inline-flex items-center gap-1 hover:text-foreground",
+          active && "text-foreground",
+          align === "right" && "flex-row-reverse",
+        )}
+      >
+        {label}
+        <Icon className={cn("size-3.5", !active && "opacity-40")} />
+      </button>
+    </th>
+  );
+}
 
 function dayLabel(occurredOn: string): string {
   return format(parseISO(occurredOn), "EEEE, d MMMM yyyy");
@@ -70,7 +140,7 @@ export function TransactionList({
   const [filters, setFilters] = useState<TransactionFilters>({});
 
   return (
-    <div className="space-y-4 pb-20">
+    <div className="space-y-4">
       <TransactionFilterBar
         accounts={accounts}
         categories={categories}
@@ -107,6 +177,7 @@ function TransactionListResults({
   const [rowIssues, setRowIssues] = useState<Record<string, RowIssue>>({});
   const [editingTransaction, setEditingTransaction] =
     useState<TransactionListItem | null>(null);
+  const [sort, setSort] = useState<SortState>({ column: "date", direction: "desc" });
   const [undo, setUndo] = useState<TransactionListItem | null>(null);
   const undoTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -141,6 +212,18 @@ function TransactionListResults({
   }, [query.data, removedIds, overrides, rowIssues]);
 
   const dayGroups = useMemo(() => groupByDay(visible), [visible]);
+  const sortedForTable = useMemo(
+    () => sortTransactions(visible, sort),
+    [visible, sort],
+  );
+
+  function toggleSort(column: SortColumn) {
+    setSort((prev) =>
+      prev.column === column
+        ? { column, direction: prev.direction === "asc" ? "desc" : "asc" }
+        : { column, direction: "desc" },
+    );
+  }
 
   const sentinelRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -298,7 +381,7 @@ function TransactionListResults({
         </p>
       )}
 
-      <div className="space-y-6">
+      <div className="space-y-6 lg:hidden">
         {dayGroups.map((group) => {
           const total = dayTotal(group.transactions);
           return (
@@ -397,6 +480,122 @@ function TransactionListResults({
           </div>
           );
         })}
+      </div>
+
+      <div className="hidden overflow-x-auto lg:block">
+        <table className="w-full min-w-max border-collapse text-sm">
+          <thead>
+            <tr className="border-b text-left text-xs text-muted-foreground">
+              <SortableHeader label="Date" column="date" sort={sort} onSort={toggleSort} />
+              <th className="py-2 font-medium">Description</th>
+              <th className="py-2 font-medium">Account</th>
+              <th className="py-2 font-medium">Type</th>
+              <SortableHeader
+                label="Amount"
+                column="amount"
+                sort={sort}
+                onSort={toggleSort}
+                align="right"
+              />
+              <th className="py-2" />
+            </tr>
+          </thead>
+          <tbody>
+            {sortedForTable.map((t) => {
+              const category = t.categoryId
+                ? categoryById.get(t.categoryId)
+                : undefined;
+              const account = accountById.get(t.accountId);
+              const issue = rowIssues[t.id];
+              const isExpense = t.type === "expense";
+              const isIncome = t.type === "income";
+              const signedAmount = isExpense
+                ? -BigInt(t.amount)
+                : BigInt(t.amount);
+              const editable = isExpense || isIncome;
+
+              return (
+                <tr key={t.id} className="group border-b last:border-0 hover:bg-muted/40">
+                  <td className="py-2.5 whitespace-nowrap text-muted-foreground">
+                    {format(parseISO(t.occurredOn), "d MMM yyyy")}
+                  </td>
+                  <td className="max-w-0 py-2.5">
+                    <button
+                      type="button"
+                      disabled={!editable}
+                      onClick={() => editable && setEditingTransaction(t)}
+                      className="flex w-full min-w-0 items-center gap-2 text-left disabled:cursor-default"
+                    >
+                      <span
+                        className="inline-block size-2.5 shrink-0 rounded-full"
+                        style={{ backgroundColor: category?.color ?? "#94a3b8" }}
+                      />
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate">
+                          {category?.name ??
+                            (t.type === "transfer"
+                              ? "Transfer"
+                              : t.type === "adjustment"
+                                ? "Balance adjustment"
+                                : "Uncategorized")}
+                        </span>
+                        {t.note && (
+                          <span className="block truncate text-xs text-muted-foreground">
+                            {t.note}
+                          </span>
+                        )}
+                      </span>
+                    </button>
+                    {issue && (
+                      <div className="mt-1.5 flex items-center gap-2 rounded-md bg-destructive/10 px-2 py-1 text-xs text-destructive">
+                        <span className="min-w-0 flex-1 truncate">{issue.message}</span>
+                        <button
+                          type="button"
+                          onClick={issue.retry}
+                          className="shrink-0 font-medium underline"
+                        >
+                          Retry
+                        </button>
+                      </div>
+                    )}
+                  </td>
+                  <td className="py-2.5 whitespace-nowrap text-muted-foreground">
+                    {account?.name ?? "Unknown account"}
+                  </td>
+                  <td className="py-2.5">
+                    <TransactionTypeIcon type={t.type} />
+                  </td>
+                  <td className="py-2.5 text-right">
+                    <Amount
+                      value={signedAmount}
+                      size="sm"
+                      tone={transactionAmountTone(t.type)}
+                      showSign={isIncome || t.type === "adjustment"}
+                      showUnit={false}
+                    />
+                  </td>
+                  <td className="py-2.5 text-right">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="opacity-0 group-hover:opacity-100"
+                      onClick={() => handleDelete(t)}
+                    >
+                      Delete
+                    </Button>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+
+        {sortedForTable.length === 0 && !query.isPending && (
+          <p className="py-4 text-sm text-muted-foreground">
+            No transactions match these filters.
+          </p>
+        )}
       </div>
 
       <div ref={sentinelRef} />

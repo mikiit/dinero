@@ -25,7 +25,7 @@ export default async function TransactionsPage() {
   ]);
 
   return (
-    <main className="mx-auto max-w-md space-y-4 p-4">
+    <main className="mx-auto max-w-md space-y-4 p-4 lg:max-w-5xl lg:p-8">
       <h1 className="font-heading text-xl font-medium">Transactions</h1>
       <TransactionList accounts={accounts} categories={categories} />
     </main>

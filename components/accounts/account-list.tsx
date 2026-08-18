@@ -23,7 +23,7 @@ export function AccountList({ accounts }: { accounts: Account[] }) {
   }
 
   return (
-    <ul className="space-y-3">
+    <ul className="grid grid-cols-1 gap-3 lg:grid-cols-2 lg:gap-4 xl:grid-cols-3">
       {accounts.map((account) => {
         const isCredit = account.type === "credit";
         const owed = isCredit ? -account.balance : 0n;

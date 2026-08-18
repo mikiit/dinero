@@ -65,7 +65,7 @@ export function TransactionFormFields({
   const categoryOptions = buildCategoryOptions(categories, state.type);
 
   return (
-    <div className="flex flex-col gap-4 overflow-y-auto px-4">
+    <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-4">
       <div className="flex gap-2">
         {TRANSACTION_TYPES.map((t) => (
           <Button
@@ -87,6 +87,7 @@ export function TransactionFormFields({
           inputMode="decimal"
           autoFocus={autoFocusAmount}
           placeholder="0"
+          className="font-mono tabular-nums"
           value={state.amount}
           onChange={(e) => onChange({ amount: e.target.value })}
         />
