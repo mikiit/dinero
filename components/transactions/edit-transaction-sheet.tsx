@@ -20,10 +20,15 @@ import {
 } from "@/components/transactions/transaction-form-fields";
 import type { TransactionListItem } from "@/app/transactions/actions";
 
+// Only reachable for expense/income rows (transaction-list.tsx disables
+// opening this sheet for transfer/adjustment), so toAccountId is always
+// "" here in practice - present only because TransactionFormState requires
+// it.
 function toFormState(transaction: TransactionListItem): TransactionFormState {
   return {
     type: transaction.type as TransactionType,
     accountId: transaction.accountId,
+    toAccountId: transaction.toAccountId ?? "",
     categoryId: transaction.categoryId ?? "",
     amount: transaction.amount, // minor units string; toMinor requires a
     // major-unit decimal string, so this gets reformatted below.
@@ -81,6 +86,7 @@ function EditTransactionForm({
         accounts={accounts}
         categories={categories}
         error={formError}
+        allowedTypes={["expense", "income"]}
       />
 
       <SheetFooter>

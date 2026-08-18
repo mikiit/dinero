@@ -13,11 +13,12 @@ import {
 import type { Account } from "@/lib/db/accounts";
 import type { Category, CategoryKind } from "@/lib/db/categories";
 
-export type TransactionType = CategoryKind;
+export type TransactionType = "expense" | "income" | "transfer";
 
 export const TRANSACTION_TYPE_LABELS: Record<TransactionType, string> = {
   expense: "Expense",
   income: "Income",
+  transfer: "Transfer",
 };
 
 export const TRANSACTION_TYPES = Object.keys(
@@ -41,6 +42,8 @@ export function buildCategoryOptions(categories: Category[], kind: CategoryKind)
 export type TransactionFormState = {
   type: TransactionType;
   accountId: string;
+  /** Transfer only - the destination account. */
+  toAccountId: string;
   categoryId: string;
   amount: string;
   occurredOn: string;
@@ -54,6 +57,7 @@ export function TransactionFormFields({
   categories,
   autoFocusAmount = false,
   error,
+  allowedTypes = TRANSACTION_TYPES,
 }: {
   state: TransactionFormState;
   onChange: (next: Partial<TransactionFormState>) => void;
@@ -61,19 +65,29 @@ export function TransactionFormFields({
   categories: Category[];
   autoFocusAmount?: boolean;
   error?: string | null;
+  /** Which type toggle buttons to show - editing an existing transaction
+   * only ever offers expense/income (see edit-transaction-sheet.tsx);
+   * turning an expense into a transfer, or vice versa, isn't a supported
+   * flow, so transfer is left out of that toggle entirely rather than
+   * exposed and then rejected. */
+  allowedTypes?: TransactionType[];
 }) {
-  const categoryOptions = buildCategoryOptions(categories, state.type);
+  const isTransfer = state.type === "transfer";
+  const categoryOptions = isTransfer
+    ? []
+    : buildCategoryOptions(categories, state.type as CategoryKind);
+  const toAccountOptions = accounts.filter((a) => a.id !== state.accountId);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-4">
       <div className="flex gap-2">
-        {TRANSACTION_TYPES.map((t) => (
+        {allowedTypes.map((t) => (
           <Button
             key={t}
             type="button"
             variant={state.type === t ? "default" : "outline"}
             className="flex-1"
-            onClick={() => onChange({ type: t, categoryId: "" })}
+            onClick={() => onChange({ type: t, categoryId: "", toAccountId: "" })}
           >
             {TRANSACTION_TYPE_LABELS[t]}
           </Button>
@@ -94,10 +108,19 @@ export function TransactionFormFields({
       </div>
 
       <div className="space-y-1.5">
-        <Label htmlFor="account">Account</Label>
+        <Label htmlFor="account">{isTransfer ? "From account" : "Account"}</Label>
         <Select
           value={state.accountId}
-          onValueChange={(value) => onChange({ accountId: value as string })}
+          onValueChange={(value) =>
+            onChange({
+              accountId: value as string,
+              // A from/to pair that just became equal would otherwise sit
+              // in an invalid state until submit's validation catches it -
+              // clearing the now-stale destination surfaces that
+              // immediately as "choose a destination" instead.
+              toAccountId: value === state.toAccountId ? "" : state.toAccountId,
+            })
+          }
         >
           <SelectTrigger id="account" className="w-full">
             <SelectValue>
@@ -117,29 +140,55 @@ export function TransactionFormFields({
         </Select>
       </div>
 
-      <div className="space-y-1.5">
-        <Label htmlFor="category">Category</Label>
-        <Select
-          value={state.categoryId}
-          onValueChange={(value) => onChange({ categoryId: value as string })}
-        >
-          <SelectTrigger id="category" className="w-full">
-            <SelectValue>
-              {(value: string) =>
-                categoryOptions.find((c) => c.id === value)?.label ??
-                "Choose a category"
-              }
-            </SelectValue>
-          </SelectTrigger>
-          <SelectContent>
-            {categoryOptions.map((c) => (
-              <SelectItem key={c.id} value={c.id}>
-                {c.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
+      {isTransfer ? (
+        <div className="space-y-1.5">
+          <Label htmlFor="toAccount">To account</Label>
+          <Select
+            value={state.toAccountId}
+            onValueChange={(value) => onChange({ toAccountId: value as string })}
+          >
+            <SelectTrigger id="toAccount" className="w-full">
+              <SelectValue>
+                {(value: string) =>
+                  toAccountOptions.find((a) => a.id === value)?.name ??
+                  "Choose a destination account"
+                }
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              {toAccountOptions.map((a) => (
+                <SelectItem key={a.id} value={a.id}>
+                  {a.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      ) : (
+        <div className="space-y-1.5">
+          <Label htmlFor="category">Category</Label>
+          <Select
+            value={state.categoryId}
+            onValueChange={(value) => onChange({ categoryId: value as string })}
+          >
+            <SelectTrigger id="category" className="w-full">
+              <SelectValue>
+                {(value: string) =>
+                  categoryOptions.find((c) => c.id === value)?.label ??
+                  "Choose a category"
+                }
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              {categoryOptions.map((c) => (
+                <SelectItem key={c.id} value={c.id}>
+                  {c.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
 
       <div className="space-y-1.5">
         <Label htmlFor="occurredOn">Date</Label>

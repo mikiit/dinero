@@ -5,6 +5,7 @@ import {
   EqualIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import type { Account } from "@/lib/db/accounts";
 import type { AnyTransactionType } from "@/lib/db/transactions";
 
 // A non-color signal for transaction type, so expense/income/transfer stay
@@ -38,6 +39,21 @@ const TEXT_TONE_CLASS = {
   transfer: "text-transfer",
   muted: "text-muted-foreground",
 } as const;
+
+/** For a transfer row, appends the destination account so the row shows
+ * both legs of the movement ("Checking → Savings") - every list that shows
+ * an account name shows only t.accountId (the source), which by itself
+ * would leave half of what moved invisible. */
+export function transferAccountLabel(
+  sourceAccountName: string | undefined,
+  type: AnyTransactionType,
+  toAccountId: string | null,
+  accountById: Map<string, Account>,
+): string {
+  const base = sourceAccountName ?? "Unknown account";
+  if (type !== "transfer" || !toAccountId) return base;
+  return `${base} → ${accountById.get(toAccountId)?.name ?? "Unknown account"}`;
+}
 
 export function TransactionTypeIcon({
   type,

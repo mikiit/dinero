@@ -20,7 +20,10 @@ import { toMinor } from "@/lib/money";
 export type CreateTransactionActionInput = {
   type: TransactionType;
   accountId: string;
+  /** Ignored (written as null) when type is "transfer". */
   categoryId: string;
+  /** Transfer only - the destination account. */
+  toAccountId?: string;
   /** Raw decimal string (e.g. "12,50") - parsed and validated here, never
    * trusted from the client beyond this point. */
   amount: string;
@@ -48,13 +51,22 @@ export type ListTransactionsResult = {
 };
 
 function validateTransactionInput(input: {
+  type: TransactionType;
   accountId: string;
   categoryId: string;
+  toAccountId?: string;
   occurredOn: string;
   amount: string;
 }): { error: string } | { amount: bigint } {
   if (!input.accountId) return { error: "Choose an account." };
-  if (!input.categoryId) return { error: "Choose a category." };
+  if (input.type === "transfer") {
+    if (!input.toAccountId) return { error: "Choose a destination account." };
+    if (input.toAccountId === input.accountId) {
+      return { error: "Choose two different accounts." };
+    }
+  } else if (!input.categoryId) {
+    return { error: "Choose a category." };
+  }
   if (!input.occurredOn) return { error: "Choose a date." };
 
   const amount = toMinor(input.amount);
@@ -102,7 +114,8 @@ export async function createTransactionAction(
     await createTransaction(supabase, user.id, {
       type: input.type,
       accountId: input.accountId,
-      categoryId: input.categoryId,
+      toAccountId: input.type === "transfer" ? input.toAccountId : null,
+      categoryId: input.type === "transfer" ? null : input.categoryId,
       amount: validated.amount,
       occurredOn: input.occurredOn,
       note: input.note?.trim() || null,
@@ -135,7 +148,8 @@ export async function updateTransactionAction(
     await updateTransaction(supabase, user.id, input.id, {
       type: input.type,
       accountId: input.accountId,
-      categoryId: input.categoryId,
+      toAccountId: input.type === "transfer" ? input.toAccountId : null,
+      categoryId: input.type === "transfer" ? null : input.categoryId,
       amount: validated.amount,
       occurredOn: input.occurredOn,
       note: input.note?.trim() || null,

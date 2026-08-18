@@ -2,6 +2,7 @@ import { Amount } from "@/components/ui/amount";
 import {
   TransactionTypeIcon,
   transactionAmountTone,
+  transferAccountLabel,
 } from "@/components/transactions/transaction-type-icon";
 import type { Account } from "@/lib/db/accounts";
 import type { Category } from "@/lib/db/categories";
@@ -49,7 +50,7 @@ export function RecentTransactionsList({
                         : "Uncategorized")}
                 </span>
                 <span className="block truncate text-xs text-muted-foreground">
-                  {account?.name ?? "Unknown account"}
+                  {transferAccountLabel(account?.name, t.type, t.toAccountId, accountById)}
                 </span>
               </span>
             </div>

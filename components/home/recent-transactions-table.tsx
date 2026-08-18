@@ -3,6 +3,7 @@ import { Amount } from "@/components/ui/amount";
 import {
   TransactionTypeIcon,
   transactionAmountTone,
+  transferAccountLabel,
 } from "@/components/transactions/transaction-type-icon";
 import type { Account } from "@/lib/db/accounts";
 import type { Category } from "@/lib/db/categories";
@@ -66,8 +67,8 @@ export function RecentTransactionsTable({
                   </span>
                 </span>
               </td>
-              <td className="py-2.5 text-muted-foreground">
-                {account?.name ?? "Unknown account"}
+              <td className="py-2.5 whitespace-nowrap text-muted-foreground">
+                {transferAccountLabel(account?.name, t.type, t.toAccountId, accountById)}
               </td>
               <td className="py-2.5 text-right">
                 <span className="inline-flex items-center gap-1.5">

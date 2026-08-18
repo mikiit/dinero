@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils";
 import {
   TransactionTypeIcon,
   transactionAmountTone,
+  transferAccountLabel,
 } from "@/components/transactions/transaction-type-icon";
 import { toMinor } from "@/lib/money";
 import type { Account } from "@/lib/db/accounts";
@@ -435,7 +436,7 @@ function TransactionListResults({
                                   : "Uncategorized")}
                           </span>
                           <span className="block truncate text-xs text-muted-foreground">
-                            {account?.name ?? "Unknown account"}
+                            {transferAccountLabel(account?.name, t.type, t.toAccountId, accountById)}
                             {t.note ? ` · ${t.note}` : ""}
                           </span>
                         </span>
@@ -560,7 +561,7 @@ function TransactionListResults({
                     )}
                   </td>
                   <td className="py-2.5 whitespace-nowrap text-muted-foreground">
-                    {account?.name ?? "Unknown account"}
+                    {transferAccountLabel(account?.name, t.type, t.toAccountId, accountById)}
                   </td>
                   <td className="py-2.5">
                     <TransactionTypeIcon type={t.type} />

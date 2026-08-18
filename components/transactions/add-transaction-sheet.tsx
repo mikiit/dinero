@@ -30,6 +30,7 @@ function emptyForm(accounts: Account[]): TransactionFormState {
   return {
     type: "expense",
     accountId: accounts[0]?.id ?? "",
+    toAccountId: "",
     categoryId: "",
     amount: "",
     occurredOn: todayIso(),
@@ -61,7 +62,14 @@ export function AddTransactionSheet({
 
   function validate(): string | null {
     if (!form.accountId) return "Choose an account.";
-    if (!form.categoryId) return "Choose a category.";
+    if (form.type === "transfer") {
+      if (!form.toAccountId) return "Choose a destination account.";
+      if (form.toAccountId === form.accountId) {
+        return "Choose two different accounts.";
+      }
+    } else if (!form.categoryId) {
+      return "Choose a category.";
+    }
     if (!form.amount.trim()) return "Enter an amount.";
     try {
       if (toMinor(form.amount) <= 0n) return "Enter an amount greater than zero.";
@@ -98,6 +106,7 @@ export function AddTransactionSheet({
         ...prev,
         amount: "",
         categoryId: "",
+        toAccountId: "",
         note: "",
         occurredOn: todayIso(),
       }));
@@ -129,7 +138,7 @@ export function AddTransactionSheet({
       <SheetContent side="bottom">
         <SheetHeader>
           <SheetTitle>Add transaction</SheetTitle>
-          <SheetDescription>Log an expense or income.</SheetDescription>
+          <SheetDescription>Log an expense, income, or transfer.</SheetDescription>
         </SheetHeader>
 
         <TransactionFormFields

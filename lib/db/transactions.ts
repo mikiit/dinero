@@ -2,11 +2,11 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/database.types";
 import { fromDbAmount, toDbAmount } from "@/lib/money";
 
-/** Scoped to what the Add/Edit Transaction sheet creates - transfer and
- * adjustment are their own, later flows (SPEC.md Phase 2), though the list
- * still has to be able to *display* them if they exist. */
-export type TransactionType = "expense" | "income";
-export type AnyTransactionType = TransactionType | "transfer" | "adjustment";
+/** What the Add/Edit Transaction sheet can create - adjustment is its own
+ * flow (createAdjustment below, "Set current balance"), though the list
+ * still has to be able to *display* it if it exists. */
+export type TransactionType = "expense" | "income" | "transfer";
+export type AnyTransactionType = TransactionType | "adjustment";
 
 export type Transaction = {
   id: string;
@@ -52,7 +52,11 @@ export type TransactionsPage = {
 export type CreateTransactionInput = {
   type: TransactionType;
   accountId: string;
-  categoryId: string;
+  /** Transfer only - the destination account. Ignored for expense/income. */
+  toAccountId?: string | null;
+  /** Expense/income only - null is written for transfer regardless of what's
+   * passed here, matching the category_only_for_expense_income DB check. */
+  categoryId?: string | null;
   amount: bigint;
   occurredOn: string;
   note?: string | null;
@@ -258,10 +262,14 @@ export async function listTransactionsPage(
 }
 
 /**
- * Inserts a single expense/income transaction. currency is looked up from
- * the target account rather than trusted from the caller - accounts are
- * always RSD today (no currency picker exists yet, SPEC.md Phase 3), but
+ * Inserts a single expense/income/transfer transaction. currency is looked
+ * up from the source account rather than trusted from the caller - accounts
+ * are always RSD today (no currency picker exists yet, SPEC.md Phase 3), but
  * this stays correct once that changes instead of silently hardcoding it.
+ * For a transfer, the `transactions` table's own CHECK constraints
+ * (transfer_requires_to_account, transfer_not_to_self,
+ * category_only_for_expense_income) are the last line of defense if a
+ * caller ever gets the type/toAccountId/categoryId combination wrong.
  */
 export async function createTransaction(
   supabase: SupabaseClient<Database>,
@@ -281,7 +289,8 @@ export async function createTransaction(
     user_id: userId,
     type: input.type,
     account_id: input.accountId,
-    category_id: input.categoryId,
+    to_account_id: input.type === "transfer" ? (input.toAccountId ?? null) : null,
+    category_id: input.type === "transfer" ? null : (input.categoryId ?? null),
     amount: toDbAmount(input.amount),
     currency: account.currency,
     occurred_on: input.occurredOn,
@@ -311,7 +320,8 @@ export async function updateTransaction(
     .update({
       type: input.type,
       account_id: input.accountId,
-      category_id: input.categoryId,
+      to_account_id: input.type === "transfer" ? (input.toAccountId ?? null) : null,
+      category_id: input.type === "transfer" ? null : (input.categoryId ?? null),
       amount: toDbAmount(input.amount),
       currency: account.currency,
       occurred_on: input.occurredOn,
