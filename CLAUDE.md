@@ -35,6 +35,3 @@ Vitest. Required coverage: money conversion, balance calculation, recurring-rule
 - Commit per logical unit with a conventional-commit message.
 - Run `npm run typecheck && npm run lint && npm test` before declaring anything done.
 - When a requirement is ambiguous, ask rather than assume — this is a personal-finance app and silently wrong numbers are the worst failure mode.
-
-## Framework agent notes
-@AGENTS.md
