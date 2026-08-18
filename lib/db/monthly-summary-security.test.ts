@@ -1,7 +1,7 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { Database } from "@/lib/database.types";
-import { loadTestEnv } from "./test-env";
+import { loadTestEnv, signInAnonymouslyWithRetry } from "./test-env";
 
 // Integration test against the LIVE linked Supabase project - proves
 // supabase/migrations/20260814120000_create_monthly_summary_view.sql was
@@ -30,8 +30,8 @@ describe.skipIf(!hasCredentials)("monthly_summary view security_invoker (live)",
     clientB = createClient<Database>(url!, anonKey!);
 
     const [sessionA, sessionB] = await Promise.all([
-      clientA.auth.signInAnonymously(),
-      clientB.auth.signInAnonymously(),
+      signInAnonymouslyWithRetry(clientA),
+      signInAnonymouslyWithRetry(clientB),
     ]);
     if (sessionA.error || !sessionA.data.user) throw sessionA.error;
     if (sessionB.error || !sessionB.data.user) throw sessionB.error;
@@ -85,7 +85,7 @@ describe.skipIf(!hasCredentials)("monthly_summary view security_invoker (live)",
   }, 30000);
 
   afterAll(async () => {
-    if (!admin) return;
+    if (!userA || !userB) return;
     await admin.from("transactions").delete().in("user_id", [userA, userB]);
     await admin.from("categories").delete().in("user_id", [userA, userB]);
     await admin.from("accounts").delete().in("user_id", [userA, userB]);

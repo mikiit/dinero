@@ -2,14 +2,14 @@
 
 import { useState, useTransition } from "react";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -69,128 +69,130 @@ export function CategoryDialog({
   }
 
   return (
-    <Dialog
+    <Sheet
       open={open}
       onOpenChange={(next) => {
         setOpen(next);
         if (!next) reset();
       }}
     >
-      <DialogTrigger
+      <SheetTrigger
         render={
           isEdit ? <Button variant="outline" size="sm" /> : <Button size="sm" />
         }
       >
         {isEdit ? "Edit" : "Add category"}
-      </DialogTrigger>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>{isEdit ? `Edit ${category.name}` : "Add category"}</DialogTitle>
-          <DialogDescription>
+      </SheetTrigger>
+      <SheetContent side="bottom">
+        <SheetHeader>
+          <SheetTitle>{isEdit ? `Edit ${category.name}` : "Add category"}</SheetTitle>
+          <SheetDescription>
             {isEdit
               ? "Update this category's details."
               : "Expense or income, optionally under a parent."}
-          </DialogDescription>
-        </DialogHeader>
+          </SheetDescription>
+        </SheetHeader>
 
-        <form action={handleSubmit} className="space-y-4">
-          {isEdit && <input type="hidden" name="categoryId" value={category.id} />}
+        <form action={handleSubmit} className="flex min-h-0 flex-1 flex-col">
+          <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-4">
+            {isEdit && <input type="hidden" name="categoryId" value={category.id} />}
 
-          <div className="space-y-1.5">
-            <Label htmlFor="name">Name</Label>
-            <Input
-              id="name"
-              name="name"
-              required
-              defaultValue={category?.name}
-              placeholder="Groceries"
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <Label htmlFor="icon">Icon</Label>
+              <Label htmlFor="name">Name</Label>
               <Input
-                id="icon"
-                name="icon"
-                defaultValue={category?.icon ?? ""}
-                placeholder="🛒"
-                maxLength={8}
+                id="name"
+                name="name"
+                required
+                defaultValue={category?.name}
+                placeholder="Groceries"
               />
             </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="color">Color</Label>
-              <Input
-                id="color"
-                name="color"
-                type="color"
-                defaultValue={category?.color ?? "#94a3b8"}
-                className="h-8 p-1"
-              />
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="icon">Icon</Label>
+                <Input
+                  id="icon"
+                  name="icon"
+                  defaultValue={category?.icon ?? ""}
+                  placeholder="🛒"
+                  maxLength={8}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="color">Color</Label>
+                <Input
+                  id="color"
+                  name="color"
+                  type="color"
+                  defaultValue={category?.color ?? "#94a3b8"}
+                  className="h-11 p-1 lg:h-8"
+                />
+              </div>
             </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="kind">Kind</Label>
+              <Select
+                name="kind"
+                value={kind}
+                onValueChange={(value) => {
+                  setKind(value as CategoryKind);
+                  setParentId("none");
+                }}
+              >
+                <SelectTrigger id="kind" className="w-full">
+                  <SelectValue>
+                    {(value: CategoryKind) => KIND_LABELS[value]}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {CATEGORY_KINDS.map((k) => (
+                    <SelectItem key={k} value={k}>
+                      {KIND_LABELS[k]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="parentId">Parent</Label>
+              <Select
+                name="parentId"
+                value={parentId}
+                onValueChange={(value) => setParentId(value as string)}
+              >
+                <SelectTrigger id="parentId" className="w-full">
+                  <SelectValue>
+                    {(value: string) =>
+                      value === "none"
+                        ? "None (top-level)"
+                        : (parentOptions.find((c) => c.id === value)?.name ?? value)
+                    }
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">None (top-level)</SelectItem>
+                  {parentOptions.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {error && <p className="text-sm text-destructive">{error}</p>}
           </div>
 
-          <div className="space-y-1.5">
-            <Label htmlFor="kind">Kind</Label>
-            <Select
-              name="kind"
-              value={kind}
-              onValueChange={(value) => {
-                setKind(value as CategoryKind);
-                setParentId("none");
-              }}
-            >
-              <SelectTrigger id="kind" className="w-full">
-                <SelectValue>
-                  {(value: CategoryKind) => KIND_LABELS[value]}
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                {CATEGORY_KINDS.map((k) => (
-                  <SelectItem key={k} value={k}>
-                    {KIND_LABELS[k]}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-1.5">
-            <Label htmlFor="parentId">Parent</Label>
-            <Select
-              name="parentId"
-              value={parentId}
-              onValueChange={(value) => setParentId(value as string)}
-            >
-              <SelectTrigger id="parentId" className="w-full">
-                <SelectValue>
-                  {(value: string) =>
-                    value === "none"
-                      ? "None (top-level)"
-                      : (parentOptions.find((c) => c.id === value)?.name ?? value)
-                  }
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">None (top-level)</SelectItem>
-                {parentOptions.map((c) => (
-                  <SelectItem key={c.id} value={c.id}>
-                    {c.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {error && <p className="text-sm text-destructive">{error}</p>}
-
-          <DialogFooter>
+          <SheetFooter>
             <Button type="submit" disabled={pending}>
               {pending ? "Saving..." : isEdit ? "Save changes" : "Add category"}
             </Button>
-          </DialogFooter>
+          </SheetFooter>
         </form>
-      </DialogContent>
-    </Dialog>
+      </SheetContent>
+    </Sheet>
   );
 }

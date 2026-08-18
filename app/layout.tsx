@@ -6,6 +6,7 @@ import { Sidebar } from "@/components/nav/sidebar";
 import { createClient } from "@/lib/supabase/server";
 import { listAccounts } from "@/lib/db/accounts";
 import { listCategories } from "@/lib/db/categories";
+import { themeInitScript } from "@/lib/theme";
 import "./globals.css";
 
 // Space Grotesk + JetBrains Mono, not the shadcn/Geist default - the mono
@@ -53,7 +54,15 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
     <html
       lang="en"
       className={`${spaceGrotesk.variable} ${jetbrainsMono.variable} h-full antialiased`}
+      suppressHydrationWarning
     >
+      <head>
+        {/* Sets .dark before first paint, ahead of hydration - a class
+            React didn't render server-side, hence suppressHydrationWarning
+            above (the standard, documented tradeoff for a flash-free
+            theme). */}
+        <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
+      </head>
       <body className="min-h-full flex flex-col">
         <Providers>
           <Sidebar accounts={accounts} categories={categories} />

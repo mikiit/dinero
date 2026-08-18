@@ -2,14 +2,14 @@
 
 import { useState, useTransition } from "react";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -65,27 +65,27 @@ export function SetBalanceDialog({ account }: { account: Account }) {
   }
 
   return (
-    <Dialog
+    <Sheet
       open={open}
       onOpenChange={(next) => {
         setOpen(next);
         if (!next) reset();
       }}
     >
-      <DialogTrigger render={<Button variant="outline" size="sm" />}>
+      <SheetTrigger render={<Button variant="outline" size="sm" />}>
         Set balance
-      </DialogTrigger>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Set balance for {account.name}</DialogTitle>
-          <DialogDescription>
+      </SheetTrigger>
+      <SheetContent side="bottom">
+        <SheetHeader>
+          <SheetTitle>Set balance for {account.name}</SheetTitle>
+          <SheetDescription>
             {isCredit
               ? "Enter what you currently owe. This writes a single adjustment for the difference - opening balance is never changed."
               : "Enter the account's current balance. This writes a single adjustment for the difference - opening balance is never changed."}
-          </DialogDescription>
-        </DialogHeader>
+          </SheetDescription>
+        </SheetHeader>
 
-        <div className="space-y-4">
+        <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-4">
           <div className="space-y-1.5">
             <Label htmlFor="targetBalance">
               {isCredit ? "Owed" : "Balance"} (RSD)
@@ -94,6 +94,7 @@ export function SetBalanceDialog({ account }: { account: Account }) {
               id="targetBalance"
               inputMode="decimal"
               autoFocus
+              className="font-mono tabular-nums"
               value={amountInput}
               onChange={(e) => setAmountInput(e.target.value)}
             />
@@ -143,7 +144,7 @@ export function SetBalanceDialog({ account }: { account: Account }) {
           {error && <p className="text-sm text-destructive">{error}</p>}
         </div>
 
-        <DialogFooter>
+        <SheetFooter>
           <Button
             type="button"
             onClick={handleConfirm}
@@ -151,8 +152,8 @@ export function SetBalanceDialog({ account }: { account: Account }) {
           >
             {pending ? "Saving…" : "Confirm"}
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </SheetFooter>
+      </SheetContent>
+    </Sheet>
   );
 }

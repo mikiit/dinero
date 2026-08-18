@@ -1,7 +1,7 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { Database } from "@/lib/database.types";
-import { loadTestEnv } from "./test-env";
+import { loadTestEnv, signInAnonymouslyWithRetry } from "./test-env";
 
 // Integration test against the LIVE linked Supabase project - proves
 // supabase/migrations/20260813140000_lock_account_type_and_currency.sql
@@ -21,7 +21,7 @@ describe.skipIf(!hasCredentials)("account type/currency immutability (live)", ()
     admin = createClient<Database>(url!, secretKey!);
     client = createClient<Database>(url!, anonKey!);
 
-    const { data, error } = await client.auth.signInAnonymously();
+    const { data, error } = await signInAnonymouslyWithRetry(client);
     if (error || !data.user) throw error;
     userId = data.user.id;
 
@@ -35,7 +35,7 @@ describe.skipIf(!hasCredentials)("account type/currency immutability (live)", ()
   }, 30000);
 
   afterAll(async () => {
-    if (!admin) return;
+    if (!userId) return;
     await admin.from("accounts").delete().eq("user_id", userId);
     await admin.auth.admin.deleteUser(userId);
   }, 30000);

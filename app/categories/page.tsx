@@ -22,7 +22,7 @@ export default async function CategoriesPage() {
   const categories = await listCategories(supabase, user.id);
 
   return (
-    <main className="mx-auto max-w-md space-y-4 p-4">
+    <main className="mx-auto max-w-md space-y-4 p-4 lg:max-w-4xl lg:p-8">
       <div className="flex items-center justify-between">
         <h1 className="font-heading text-xl font-medium">Categories</h1>
         <CategoryDialog allCategories={categories} />

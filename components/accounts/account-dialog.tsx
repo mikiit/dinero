@@ -2,14 +2,14 @@
 
 import { useState, useTransition } from "react";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -56,7 +56,7 @@ export function AccountDialog({ account }: { account?: Account }) {
   }
 
   return (
-    <Dialog
+    <Sheet
       open={open}
       onOpenChange={(next) => {
         setOpen(next);
@@ -66,24 +66,25 @@ export function AccountDialog({ account }: { account?: Account }) {
         }
       }}
     >
-      <DialogTrigger
+      <SheetTrigger
         render={
           isEdit ? <Button variant="outline" size="sm" /> : <Button size="sm" />
         }
       >
         {isEdit ? "Edit" : "Add account"}
-      </DialogTrigger>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>{isEdit ? `Edit ${account.name}` : "Add account"}</DialogTitle>
-          <DialogDescription>
+      </SheetTrigger>
+      <SheetContent side="bottom">
+        <SheetHeader>
+          <SheetTitle>{isEdit ? `Edit ${account.name}` : "Add account"}</SheetTitle>
+          <SheetDescription>
             {isEdit
               ? "Update this account's details."
               : "Cash, a debit card, a credit card, or a savings account."}
-          </DialogDescription>
-        </DialogHeader>
+          </SheetDescription>
+        </SheetHeader>
 
-        <form action={handleSubmit} className="space-y-4">
+        <form action={handleSubmit} className="flex min-h-0 flex-1 flex-col">
+          <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-4">
           {isEdit && <input type="hidden" name="accountId" value={account.id} />}
 
           <div className="space-y-1.5">
@@ -139,6 +140,7 @@ export function AccountDialog({ account }: { account?: Account }) {
                 name="openingBalance"
                 inputMode="decimal"
                 placeholder="0"
+                className="font-mono tabular-nums"
                 defaultValue="0"
               />
             </div>
@@ -153,6 +155,7 @@ export function AccountDialog({ account }: { account?: Account }) {
                   name="creditLimit"
                   inputMode="decimal"
                   placeholder="0"
+                  className="font-mono tabular-nums"
                   defaultValue={
                     account?.creditLimit != null
                       ? fromMinor(account.creditLimit).toString()
@@ -197,14 +200,15 @@ export function AccountDialog({ account }: { account?: Account }) {
           </div>
 
           {error && <p className="text-sm text-destructive">{error}</p>}
+          </div>
 
-          <DialogFooter>
+          <SheetFooter>
             <Button type="submit" disabled={pending}>
               {pending ? "Saving..." : isEdit ? "Save changes" : "Add account"}
             </Button>
-          </DialogFooter>
+          </SheetFooter>
         </form>
-      </DialogContent>
-    </Dialog>
+      </SheetContent>
+    </Sheet>
   );
 }

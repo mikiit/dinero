@@ -56,14 +56,15 @@ export function TransactionFilterBar({
   ];
 
   return (
-    <div className="flex flex-col gap-2">
+    <div className="flex flex-col gap-2 lg:flex-row lg:flex-wrap lg:items-center">
       <Input
         placeholder="Search notes and merchants"
         value={searchInput}
         onChange={(e) => setSearchInput(e.target.value)}
+        className="lg:w-56"
       />
 
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-2 gap-2 lg:contents">
         <Select
           value={filters.accountId ?? "all"}
           onValueChange={(value) =>
@@ -73,7 +74,7 @@ export function TransactionFilterBar({
             })
           }
         >
-          <SelectTrigger className="w-full">
+          <SelectTrigger className="w-full lg:w-40">
             <SelectValue>
               {(value: string) =>
                 value === "all"
@@ -102,7 +103,7 @@ export function TransactionFilterBar({
             })
           }
         >
-          <SelectTrigger className="w-full">
+          <SelectTrigger className="w-full lg:w-40">
             <SelectValue>
               {(value: string) =>
                 value === "all"
@@ -132,7 +133,7 @@ export function TransactionFilterBar({
             })
           }
         >
-          <SelectTrigger className="w-full">
+          <SelectTrigger className="w-full lg:w-36">
             <SelectValue>
               {(value: string) =>
                 TYPE_OPTIONS.find((o) => o.value === value)?.label ??
@@ -149,10 +150,10 @@ export function TransactionFilterBar({
           </SelectContent>
         </Select>
 
-        <div />
+        <div className="lg:hidden" />
       </div>
 
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-2 gap-2 lg:contents">
         <Input
           type="date"
           aria-label="From date"
@@ -160,6 +161,7 @@ export function TransactionFilterBar({
           onChange={(e) =>
             onChange({ ...filters, dateFrom: e.target.value || undefined })
           }
+          className="lg:w-40"
         />
         <Input
           type="date"
@@ -168,6 +170,7 @@ export function TransactionFilterBar({
           onChange={(e) =>
             onChange({ ...filters, dateTo: e.target.value || undefined })
           }
+          className="lg:w-40"
         />
       </div>
     </div>

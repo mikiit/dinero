@@ -1,7 +1,7 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { Database } from "@/lib/database.types";
-import { loadTestEnv } from "./test-env";
+import { loadTestEnv, signInAnonymouslyWithRetry } from "./test-env";
 
 // Integration test against the LIVE linked Supabase project — the ownership
 // trigger (supabase/migrations/20260804190008_add_ownership_triggers.sql)
@@ -35,8 +35,8 @@ describe.skipIf(!hasCredentials)("ownership triggers (live)", () => {
     clientB = createClient<Database>(url!, anonKey!);
 
     const [sessionA, sessionB] = await Promise.all([
-      clientA.auth.signInAnonymously(),
-      clientB.auth.signInAnonymously(),
+      signInAnonymouslyWithRetry(clientA),
+      signInAnonymouslyWithRetry(clientB),
     ]);
     if (sessionA.error || !sessionA.data.user) throw sessionA.error;
     if (sessionB.error || !sessionB.data.user) throw sessionB.error;
@@ -86,7 +86,7 @@ describe.skipIf(!hasCredentials)("ownership triggers (live)", () => {
   }, 30000);
 
   afterAll(async () => {
-    if (!admin) return;
+    if (!userA || !userB) return;
     await admin.from("budgets").delete().in("user_id", [userA, userB]);
     await admin.from("transactions").delete().in("user_id", [userA, userB]);
     await admin.from("categories").delete().in("user_id", [userA, userB]);

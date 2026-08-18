@@ -1,7 +1,7 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { Database } from "@/lib/database.types";
-import { loadTestEnv } from "./test-env";
+import { loadTestEnv, signInAnonymouslyWithRetry } from "./test-env";
 
 // Integration test against the LIVE linked Supabase project - proves
 // supabase/migrations/20260813140100_add_category_hierarchy_trigger.sql
@@ -26,8 +26,8 @@ describe.skipIf(!hasCredentials)("category hierarchy trigger (live)", () => {
     clientB = createClient<Database>(url!, anonKey!);
 
     const [sessionA, sessionB] = await Promise.all([
-      clientA.auth.signInAnonymously(),
-      clientB.auth.signInAnonymously(),
+      signInAnonymouslyWithRetry(clientA),
+      signInAnonymouslyWithRetry(clientB),
     ]);
     if (sessionA.error || !sessionA.data.user) throw sessionA.error;
     if (sessionB.error || !sessionB.data.user) throw sessionB.error;
@@ -53,7 +53,7 @@ describe.skipIf(!hasCredentials)("category hierarchy trigger (live)", () => {
   }, 30000);
 
   afterAll(async () => {
-    if (!admin) return;
+    if (!userA || !userB) return;
     await admin.from("categories").delete().in("user_id", [userA, userB]);
     await admin.auth.admin.deleteUser(userA);
     await admin.auth.admin.deleteUser(userB);

@@ -1,7 +1,7 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { Database } from "@/lib/database.types";
-import { loadTestEnv } from "./test-env";
+import { loadTestEnv, signInAnonymouslyWithRetry } from "./test-env";
 import { listTransactionsPage, type TransactionsCursor } from "./transactions";
 
 // Integration test against the LIVE linked Supabase project for
@@ -30,7 +30,7 @@ describe.skipIf(!hasCredentials)("listTransactionsPage pagination (live)", () =>
     admin = createClient<Database>(url!, secretKey!);
     client = createClient<Database>(url!, anonKey!);
 
-    const { data, error } = await client.auth.signInAnonymously();
+    const { data, error } = await signInAnonymouslyWithRetry(client);
     if (error || !data.user) throw error;
     userId = data.user.id;
 
@@ -73,7 +73,7 @@ describe.skipIf(!hasCredentials)("listTransactionsPage pagination (live)", () =>
   }, 30000);
 
   afterAll(async () => {
-    if (!admin) return;
+    if (!userId) return;
     await admin.from("transactions").delete().eq("user_id", userId);
     await admin.from("categories").delete().eq("user_id", userId);
     await admin.from("accounts").delete().eq("user_id", userId);
