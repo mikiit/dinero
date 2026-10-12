@@ -65,12 +65,14 @@ export default async function HomePage() {
         categories={categories}
         recentTransactions={recentTransactions}
         monthlySummary={monthlySummary}
+        canWrite={ctx.canWrite}
       />
       <DesktopHome
         accounts={accounts}
         categories={categories}
         recentTransactions={recentTransactions}
         monthlySummary={monthlySummary}
+        canWrite={ctx.canWrite}
       />
     </>
   );

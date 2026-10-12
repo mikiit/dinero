@@ -8,6 +8,7 @@ import {
 import type { Account } from "@/lib/db/accounts";
 import type { Category } from "@/lib/db/categories";
 import type { Transaction } from "@/lib/db/transactions";
+import { NoTransactionsYet } from "@/components/home/no-transactions-yet";
 
 /** Desktop counterpart to RecentTransactionsList - same data, same
  * Amount/TransactionTypeIcon primitives, but a real <table> instead of a
@@ -16,13 +17,15 @@ export function RecentTransactionsTable({
   transactions,
   accounts,
   categories,
+  canWrite = true,
 }: {
   transactions: Transaction[];
   accounts: Account[];
   categories: Category[];
+  canWrite?: boolean;
 }) {
   if (transactions.length === 0) {
-    return <p className="text-sm text-muted-foreground">No transactions yet.</p>;
+    return <NoTransactionsYet canWrite={canWrite} />;
   }
 
   const accountById = new Map(accounts.map((a) => [a.id, a]));

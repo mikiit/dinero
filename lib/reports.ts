@@ -97,3 +97,29 @@ export function formatShare(bp: number): string {
     maximumFractionDigits: 1,
   }).format(bp / 100)}%`;
 }
+
+export type Change =
+  /** Spent something this month and nothing last month. */
+  | { kind: "new" }
+  /** Within half a percent either way: not worth a headline. */
+  | { kind: "same" }
+  | { kind: "up"; percent: number }
+  | { kind: "down"; percent: number };
+
+/**
+ * How `current` differs from `previous` as a whole-number percentage, or null
+ * when there is nothing to compare (nothing spent in either month). Computed
+ * with bigint basis points and rounded once at the end - no float
+ * accumulation on the way. "Down 100%" means it went to zero.
+ */
+export function percentChange(current: bigint, previous: bigint): Change | null {
+  if (current === 0n && previous === 0n) return null;
+  if (previous === 0n) return { kind: "new" };
+
+  const bp = ((current - previous) * 10000n) / previous; // truncates toward zero
+  const percent = Math.round(Number(bp) / 100);
+  if (Math.abs(Number(bp)) < 50) return { kind: "same" };
+  return percent > 0
+    ? { kind: "up", percent }
+    : { kind: "down", percent: Math.abs(percent) };
+}

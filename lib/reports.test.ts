@@ -3,6 +3,7 @@ import {
   fillMonthSeries,
   formatShare,
   parseMonthParam,
+  percentChange,
   shiftMonth,
   spendByCategory,
 } from "./reports";
@@ -99,5 +100,37 @@ describe("formatShare", () => {
   it("formats basis points as sr-RS percent", () => {
     expect(formatShare(2550)).toBe("25,5%");
     expect(formatShare(10000)).toBe("100%");
+  });
+});
+
+describe("percentChange", () => {
+  it("is null when nothing was spent in either month", () => {
+    expect(percentChange(0n, 0n)).toBeNull();
+  });
+
+  it("calls spending with no history 'new'", () => {
+    expect(percentChange(5000n, 0n)).toEqual({ kind: "new" });
+  });
+
+  it("reports whole-number rises and falls", () => {
+    expect(percentChange(11800n, 10000n)).toEqual({ kind: "up", percent: 18 });
+    expect(percentChange(8800n, 10000n)).toEqual({ kind: "down", percent: 12 });
+    expect(percentChange(20000n, 10000n)).toEqual({ kind: "up", percent: 100 });
+  });
+
+  it("shows a category that fell to zero as down 100%", () => {
+    expect(percentChange(0n, 7000n)).toEqual({ kind: "down", percent: 100 });
+  });
+
+  it("ignores changes under half a percent", () => {
+    expect(percentChange(10040n, 10000n)).toEqual({ kind: "same" });
+    expect(percentChange(9960n, 10000n)).toEqual({ kind: "same" });
+    expect(percentChange(10000n, 10000n)).toEqual({ kind: "same" });
+  });
+
+  it("rounds to the nearest percent and never reports 0%", () => {
+    expect(percentChange(10149n, 10000n)).toEqual({ kind: "up", percent: 1 });
+    expect(percentChange(10151n, 10000n)).toEqual({ kind: "up", percent: 2 });
+    expect(percentChange(10060n, 10000n)).toEqual({ kind: "up", percent: 1 });
   });
 });

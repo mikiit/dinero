@@ -18,11 +18,13 @@ export function DesktopHome({
   categories,
   recentTransactions,
   monthlySummary,
+  canWrite = true,
 }: {
   accounts: Account[];
   categories: Category[];
   recentTransactions: Transaction[];
   monthlySummary: { income: bigint; expense: bigint };
+  canWrite?: boolean;
 }) {
   return (
     <main className="mx-auto hidden max-w-6xl gap-6 p-8 lg:grid lg:grid-cols-[1fr_320px]">
@@ -40,6 +42,7 @@ export function DesktopHome({
             </Link>
           </div>
           <RecentTransactionsTable
+          canWrite={canWrite}
             transactions={recentTransactions}
             accounts={accounts}
             categories={categories}

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import {
   archiveCategory,
+  restoreCategory,
   createCategory,
   moveCategory,
   updateCategory,
@@ -107,16 +108,42 @@ export async function updateCategoryAction(
   return { status: "success" };
 }
 
-export async function archiveCategoryAction(formData: FormData): Promise<void> {
+export type ArchiveCategoryResult = { error?: string; archivedAt?: string };
+
+export async function archiveCategoryAction(
+  categoryId: string,
+): Promise<ArchiveCategoryResult> {
   const gate = await requireWriteContext();
-  if (!gate.ctx) return;
+  if (!gate.ctx) return { error: gate.error };
   const { supabase, scope } = gate.ctx;
+  if (!categoryId) return { error: "Missing category." };
 
-  const categoryId = formData.get("categoryId");
-  if (typeof categoryId !== "string" || categoryId === "") return;
+  try {
+    const archivedAt = await archiveCategory(supabase, scope, categoryId);
+    revalidatePath("/", "layout");
+    return { archivedAt };
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : "Could not archive." };
+  }
+}
 
-  await archiveCategory(supabase, scope, categoryId);
-  revalidatePath("/categories");
+/** Undo for archiveCategoryAction; `archivedAt` is what it returned. */
+export async function restoreCategoryAction(
+  categoryId: string,
+  archivedAt: string,
+): Promise<{ error?: string }> {
+  const gate = await requireWriteContext();
+  if (!gate.ctx) return { error: gate.error };
+  const { supabase, scope } = gate.ctx;
+  if (!categoryId || !archivedAt) return { error: "Missing details." };
+
+  try {
+    await restoreCategory(supabase, scope, categoryId, archivedAt);
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : "Could not restore." };
+  }
+  revalidatePath("/", "layout");
+  return {};
 }
 
 export async function moveCategoryAction(formData: FormData): Promise<void> {

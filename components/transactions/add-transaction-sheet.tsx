@@ -2,7 +2,7 @@
 
 import { cloneElement, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import {
   Sheet,
@@ -21,7 +21,13 @@ import {
   TransactionFormFields,
   type TransactionFormState,
 } from "@/components/transactions/transaction-form-fields";
-import { createTransactionAction } from "@/app/transactions/actions";
+import {
+  createTransactionAction,
+  deleteTransactionAction,
+  listQuickTemplatesAction,
+} from "@/app/transactions/actions";
+import { QuickTemplates } from "@/components/transactions/quick-templates";
+import { useToast } from "@/components/ui/toaster";
 import { ReceiptField } from "@/components/transactions/receipt-field";
 import { deleteUploadedReceipt } from "@/lib/receipts-client";
 
@@ -73,11 +79,22 @@ export function AddTransactionSheet({
 
   const queryClient = useQueryClient();
   const router = useRouter();
+  const { show } = useToast();
   const mutation = useMutation({
     mutationFn: createTransactionAction,
     // Without this the Transactions list keeps showing its cached pages
     // and the new entry only appears after a reload.
-    onSettled: () => queryClient.invalidateQueries({ queryKey: ["transactions"] }),
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["transactions"] });
+      // What you usually enter just changed.
+      queryClient.invalidateQueries({ queryKey: ["quick-templates"] });
+    },
+  });
+  const templates = useQuery({
+    queryKey: ["quick-templates"],
+    queryFn: listQuickTemplatesAction,
+    enabled: open,
+    staleTime: 30_000,
   });
 
   function validate(): string | null {
@@ -117,7 +134,23 @@ export function AddTransactionSheet({
     setReceiptPath(null);
     mutation.mutate(payload, {
       onSuccess: (result) => {
-        if (result.error) onBackgroundError(result.error);
+        if (result.error) {
+          onBackgroundError(result.error);
+          return;
+        }
+        // Only once the server has it: Undo removes this exact row (its id
+        // was chosen above, so we know it without asking the server).
+        show({
+          message: "Transaction saved.",
+          undo: async () => {
+            const undone = await deleteTransactionAction(payload.id);
+            if (!undone.error) {
+              await queryClient.invalidateQueries({ queryKey: ["transactions"] });
+              router.refresh();
+            }
+            return undone;
+          },
+        });
       },
       onError: () => {
         onBackgroundError("Failed to save transaction. Please try again.");
@@ -174,6 +207,16 @@ export function AddTransactionSheet({
           <SheetTitle>Add transaction</SheetTitle>
           <SheetDescription>Log an expense, income, or transfer.</SheetDescription>
         </SheetHeader>
+
+        <QuickTemplates
+          templates={templates.data ?? []}
+          accounts={accounts}
+          categories={categories}
+          onPick={(patch) => {
+            setFormError(null);
+            setForm((prev) => ({ ...prev, ...patch }));
+          }}
+        />
 
         <TransactionFormFields
           state={form}

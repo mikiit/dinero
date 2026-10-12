@@ -16,6 +16,8 @@ import {
 } from "@/lib/db/transactions";
 import { toMinor } from "@/lib/money";
 import { isReceiptPathFor } from "@/lib/receipts";
+import { listQuickTemplates } from "@/lib/db/quick-templates";
+import type { QuickTemplate } from "@/lib/quick-templates";
 import { receiptOwnerKey } from "@/lib/scope";
 import { getContext, requireWriteContext } from "@/lib/context";
 
@@ -215,6 +217,20 @@ export async function restoreTransactionAction(
   revalidatePath("/accounts");
   revalidatePath("/");
   return {};
+}
+
+/** Quick-add suggestions for the active ledger (see lib/quick-templates.ts). */
+export async function listQuickTemplatesAction(): Promise<QuickTemplate[]> {
+  const ctx = await getContext();
+  if (!ctx) return [];
+  try {
+    return await listQuickTemplates(ctx.supabase, ctx.scope);
+  } catch (err) {
+    // Suggestions are a convenience; failing to load them must never get in
+    // the way of adding a transaction.
+    console.error("quick templates failed", err);
+    return [];
+  }
 }
 
 export async function listRecentTransactionsAction(

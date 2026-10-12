@@ -11,11 +11,13 @@ export function MobileHome({
   categories,
   recentTransactions,
   monthlySummary,
+  canWrite = true,
 }: {
   accounts: Account[];
   categories: Category[];
   recentTransactions: Transaction[];
   monthlySummary: { income: bigint; expense: bigint };
+  canWrite?: boolean;
 }) {
   return (
     <main className="mx-auto max-w-md space-y-6 p-4 lg:hidden">
@@ -28,6 +30,7 @@ export function MobileHome({
       <div className="space-y-2">
         <h2 className="text-sm font-medium">Recent transactions</h2>
         <RecentTransactionsList
+          canWrite={canWrite}
           transactions={recentTransactions}
           accounts={accounts}
           categories={categories}

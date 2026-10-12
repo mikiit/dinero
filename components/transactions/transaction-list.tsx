@@ -17,7 +17,7 @@ import {
   transactionAmountTone,
   transferAccountLabel,
 } from "@/components/transactions/transaction-type-icon";
-import { toMinor } from "@/lib/money";
+import { toDecimalString, toMinor } from "@/lib/money";
 import type { Account } from "@/lib/db/accounts";
 import type { Category } from "@/lib/db/categories";
 import type { TransactionFilters, TransactionsCursor } from "@/lib/db/transactions";
@@ -30,13 +30,12 @@ import {
 } from "@/app/transactions/actions";
 import { TransactionFilterBar } from "@/components/transactions/transaction-filter-bar";
 import { EditTransactionSheet } from "@/components/transactions/edit-transaction-sheet";
-import { UndoToast } from "@/components/transactions/undo-toast";
+import { useToast } from "@/components/ui/toaster";
 import { useLedger } from "@/components/spaces/ledger-provider";
 import type { TransactionFormState } from "@/components/transactions/transaction-form-fields";
 
 type RowIssue = { message: string; retry: () => void };
 
-const UNDO_WINDOW_MS = 5000;
 
 // Desktop table sort. Applies to whatever's currently loaded, not a
 // server-side global sort - infinite scroll loads more pages under the
@@ -186,11 +185,17 @@ function TransactionListResults({
   >({});
   const [rowIssues, setRowIssues] = useState<Record<string, RowIssue>>({});
   const { canWrite } = useLedger();
+  const canWriteHere = canWrite;
   const [editingTransaction, setEditingTransaction] =
     useState<TransactionListItem | null>(null);
   const [sort, setSort] = useState<SortState>({ column: "date", direction: "desc" });
-  const [undo, setUndo] = useState<TransactionListItem | null>(null);
-  const undoTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const { show } = useToast();
+  const hasFilters = Object.values(filters).some(Boolean);
+  const emptyMessage = hasFilters
+    ? "No transactions match these filters."
+    : canWriteHere
+      ? "No transactions yet. Tap the + button to add your first one."
+      : "No transactions yet.";
 
   const query = useInfiniteQuery({
     queryKey: ["transactions", filters],
@@ -199,12 +204,6 @@ function TransactionListResults({
     initialPageParam: null as TransactionsCursor,
     getNextPageParam: (lastPage) => lastPage.nextCursor,
   });
-
-  useEffect(() => {
-    return () => {
-      if (undoTimeoutRef.current) clearTimeout(undoTimeoutRef.current);
-    };
-  }, []);
 
   const accountById = useMemo(
     () => new Map(accounts.map((a) => [a.id, a])),
@@ -269,49 +268,35 @@ function TransactionListResults({
     setRemovedIds((prev) => new Set(prev).add(transaction.id));
     clearIssue(transaction.id);
 
+    const failed = (message: string) => {
+      setRemovedIds((prev) => {
+        const next = new Set(prev);
+        next.delete(transaction.id);
+        return next;
+      });
+      setRowIssues((prev) => ({
+        ...prev,
+        [transaction.id]: { message, retry: () => handleDelete(transaction) },
+      }));
+    };
+
     deleteTransactionAction(transaction.id)
       .then((result) => {
-        if (result.error) {
-          setRemovedIds((prev) => {
-            const next = new Set(prev);
-            next.delete(transaction.id);
-            return next;
-          });
-          setRowIssues((prev) => ({
-            ...prev,
-            [transaction.id]: {
-              message: result.error!,
-              retry: () => handleDelete(transaction),
-            },
-          }));
-        }
+        if (result.error) failed(result.error);
       })
-      .catch(() => {
-        setRemovedIds((prev) => {
-          const next = new Set(prev);
-          next.delete(transaction.id);
-          return next;
-        });
-        setRowIssues((prev) => ({
-          ...prev,
-          [transaction.id]: {
-            message: "Failed to delete transaction.",
-            retry: () => handleDelete(transaction),
-          },
-        }));
-      });
+      .catch(() => failed("Failed to delete transaction."));
 
-    if (undoTimeoutRef.current) clearTimeout(undoTimeoutRef.current);
-    setUndo(transaction);
-    undoTimeoutRef.current = setTimeout(() => setUndo(null), UNDO_WINDOW_MS);
+    show({
+      message: "Transaction deleted.",
+      undo: () => restoreDeleted(transaction),
+    });
   }
 
-  function handleUndo() {
-    if (!undo) return;
-    const transaction = undo;
-    if (undoTimeoutRef.current) clearTimeout(undoTimeoutRef.current);
-    setUndo(null);
-
+  /** Undo for handleDelete: show the row again at once, then tell the server;
+   * if that fails the toast reports it and the row carries a retry. */
+  async function restoreDeleted(
+    transaction: TransactionListItem,
+  ): Promise<{ error?: string }> {
     setRemovedIds((prev) => {
       const next = new Set(prev);
       next.delete(transaction.id);
@@ -319,30 +304,38 @@ function TransactionListResults({
     });
     clearIssue(transaction.id);
 
-    restoreTransactionAction(transaction.id)
-      .then((result) => {
-        if (result.error) {
-          setRowIssues((prev) => ({
-            ...prev,
-            [transaction.id]: {
-              message: `Couldn't undo: ${result.error}`,
-              retry: handleUndo,
-            },
-          }));
-        }
-      })
-      .catch(() => {
+    try {
+      const result = await restoreTransactionAction(transaction.id);
+      if (result.error) {
         setRowIssues((prev) => ({
           ...prev,
           [transaction.id]: {
-            message: "Couldn't undo the delete.",
-            retry: handleUndo,
+            message: `Couldn't undo: ${result.error}`,
+            retry: () => void restoreDeleted(transaction),
           },
         }));
-      });
+      }
+      return result;
+    } catch {
+      setRowIssues((prev) => ({
+        ...prev,
+        [transaction.id]: {
+          message: "Couldn't undo the delete.",
+          retry: () => void restoreDeleted(transaction),
+        },
+      }));
+      return { error: "Network problem." };
+    }
   }
 
-  function handleSaveEdit(id: string, form: TransactionFormState) {
+  function handleSaveEdit(
+    id: string,
+    form: TransactionFormState,
+    isUndo = false,
+  ) {
+    // What the row looks like right now, so "Undo" can put it back.
+    const before = visible.find((t) => t.id === id);
+
     setOverrides((prev) => ({
       ...prev,
       [id]: {
@@ -356,7 +349,23 @@ function TransactionListResults({
     }));
     clearIssue(id);
 
-    const retry = () => handleSaveEdit(id, form);
+    if (!isUndo && before) {
+      const previous: TransactionFormState = {
+        type: before.type as TransactionFormState["type"],
+        accountId: before.accountId,
+        toAccountId: before.toAccountId ?? "",
+        categoryId: before.categoryId ?? "",
+        amount: toDecimalString(BigInt(before.amount)),
+        occurredOn: before.occurredOn,
+        note: before.note ?? "",
+      };
+      show({
+        message: "Changes saved.",
+        undo: () => handleSaveEdit(id, previous, true),
+      });
+    }
+
+    const retry = () => handleSaveEdit(id, form, isUndo);
     updateTransactionAction({ id, ...form })
       .then((result) => {
         if (result.error) {
@@ -388,7 +397,7 @@ function TransactionListResults({
 
       {!query.isPending && dayGroups.length === 0 && (
         <p className="text-sm text-muted-foreground">
-          No transactions match these filters.
+          {emptyMessage}
         </p>
       )}
 
@@ -624,7 +633,7 @@ function TransactionListResults({
 
         {sortedForTable.length === 0 && !query.isPending && (
           <p className="py-4 text-sm text-muted-foreground">
-            No transactions match these filters.
+            {emptyMessage}
           </p>
         )}
       </div>
@@ -648,16 +657,6 @@ function TransactionListResults({
         onSave={handleSaveEdit}
       />
 
-      {undo && (
-        <UndoToast
-          message="Transaction deleted."
-          onUndo={handleUndo}
-          onDismiss={() => {
-            if (undoTimeoutRef.current) clearTimeout(undoTimeoutRef.current);
-            setUndo(null);
-          }}
-        />
-      )}
     </>
   );
 }

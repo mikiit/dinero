@@ -3,7 +3,7 @@ import { getMonthlySeries, getSpendBreakdown } from "@/lib/db/reports";
 import { listCategories } from "@/lib/db/categories";
 import { listBudgets } from "@/lib/db/budgets";
 import { budgetProgress } from "@/lib/budgets";
-import { monthKey, parseMonthParam } from "@/lib/reports";
+import { monthKey, parseMonthParam, shiftMonth } from "@/lib/reports";
 import { MonthNav } from "@/components/reports/month-nav";
 import { MonthSummary } from "@/components/home/month-summary";
 import { CategorySpendChart } from "@/components/reports/category-spend";
@@ -33,9 +33,11 @@ export default async function ReportsPage({
   const requested = parseMonthParam(m);
   const month = requested && requested <= currentMonth ? requested : currentMonth;
 
-  const [series, spend, categories, budgets] = await Promise.all([
+  const previousMonth = shiftMonth(month, -1);
+  const [series, spend, previousSpend, categories, budgets] = await Promise.all([
     getMonthlySeries(supabase, scope, month),
     getSpendBreakdown(supabase, scope, month),
+    getSpendBreakdown(supabase, scope, previousMonth),
     listCategories(supabase, scope),
     listBudgets(supabase, scope, month),
   ]);
@@ -109,6 +111,8 @@ export default async function ReportsPage({
             total={spend.total}
             items={spend.items}
             hrefs={hrefs}
+            previous={previousSpend}
+            previousLabel={format(parseISO(previousMonth), "MMMM")}
           />
         </section>
 

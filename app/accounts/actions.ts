@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { format } from "date-fns";
 import {
   archiveAccount,
+  restoreAccount,
   createAccount,
   getAccountBalance,
   updateAccount,
@@ -136,16 +137,37 @@ export async function updateAccountAction(
   return { status: "success" };
 }
 
-export async function archiveAccountAction(formData: FormData): Promise<void> {
+export type ArchiveResult = { error?: string };
+
+export async function archiveAccountAction(accountId: string): Promise<ArchiveResult> {
   const gate = await requireWriteContext();
-  if (!gate.ctx) return;
+  if (!gate.ctx) return { error: gate.error };
   const { supabase, scope } = gate.ctx;
+  if (!accountId) return { error: "Missing account." };
 
-  const accountId = formData.get("accountId");
-  if (typeof accountId !== "string" || accountId === "") return;
+  try {
+    await archiveAccount(supabase, scope, accountId);
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : "Could not archive." };
+  }
+  revalidatePath("/", "layout");
+  return {};
+}
 
-  await archiveAccount(supabase, scope, accountId);
-  revalidatePath("/accounts");
+/** Undo for archiveAccountAction. */
+export async function restoreAccountAction(accountId: string): Promise<ArchiveResult> {
+  const gate = await requireWriteContext();
+  if (!gate.ctx) return { error: gate.error };
+  const { supabase, scope } = gate.ctx;
+  if (!accountId) return { error: "Missing account." };
+
+  try {
+    await restoreAccount(supabase, scope, accountId);
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : "Could not restore." };
+  }
+  revalidatePath("/", "layout");
+  return {};
 }
 
 export type SetAccountBalanceResult = {

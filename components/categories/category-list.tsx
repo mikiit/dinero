@@ -46,7 +46,7 @@ function CategoryRow({
               disableDown={disableDown}
             />
             <CategoryDialog category={category} allCategories={allCategories} />
-            <ArchiveCategoryButton categoryId={category.id} />
+            <ArchiveCategoryButton categoryId={category.id} name={category.name} />
           </div>
         )}
       </div>

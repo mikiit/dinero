@@ -93,7 +93,7 @@ export function AccountList({
                 <CardContent className="flex flex-wrap justify-end gap-2 pt-0">
                   <SetBalanceDialog account={account} />
                   <AccountDialog account={account} />
-                  <ArchiveAccountButton accountId={account.id} />
+                  <ArchiveAccountButton accountId={account.id} name={account.name} />
                 </CardContent>
               )}
             </Card>

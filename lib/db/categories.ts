@@ -71,7 +71,9 @@ export async function listCategories(
     .select("*")
     .filter(...scopeFilter(scope))
     .is("archived_at", null)
-    .order("sort_order", { ascending: true });
+    .order("sort_order", { ascending: true })
+    .order("created_at", { ascending: true })
+    .order("id", { ascending: true });
 
   if (error) throw error;
 
@@ -117,11 +119,16 @@ export async function updateCategory(
   if (error) throw error;
 }
 
+/**
+ * Archives a category (and, for a parent, its children). Returns the exact
+ * timestamp used: restoreCategory needs it to bring back only the children
+ * archived by THIS action, not ones the user had archived earlier.
+ */
 export async function archiveCategory(
   supabase: SupabaseClient<Database>,
   scope: Scope,
   categoryId: string,
-): Promise<void> {
+): Promise<string> {
   const archivedAt = new Date().toISOString();
 
   const { error } = await supabase
@@ -143,6 +150,34 @@ export async function archiveCategory(
     .filter(...scopeFilter(scope))
     .is("archived_at", null);
 
+  if (childrenError) throw childrenError;
+  return archivedAt;
+}
+
+/**
+ * Undoes archiveCategory: the category itself, plus only the children that
+ * the same archive action took with it (matched by `archivedAt`) - children
+ * the user had archived on their own earlier stay archived.
+ */
+export async function restoreCategory(
+  supabase: SupabaseClient<Database>,
+  scope: Scope,
+  categoryId: string,
+  archivedAt: string,
+): Promise<void> {
+  const { error } = await supabase
+    .from("categories")
+    .update({ archived_at: null })
+    .eq("id", categoryId)
+    .filter(...scopeFilter(scope));
+  if (error) throw error;
+
+  const { error: childrenError } = await supabase
+    .from("categories")
+    .update({ archived_at: null })
+    .eq("parent_id", categoryId)
+    .eq("archived_at", archivedAt)
+    .filter(...scopeFilter(scope));
   if (childrenError) throw childrenError;
 }
 

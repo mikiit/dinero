@@ -83,7 +83,9 @@ export async function listAccounts(
       .select("*")
       .filter(...scopeFilter(scope))
       .is("archived_at", null)
-      .order("sort_order", { ascending: true }),
+      .order("sort_order", { ascending: true })
+      .order("created_at", { ascending: true })
+      .order("id", { ascending: true }),
     supabase
       .from("account_balances")
       .select("account_id, balance")
@@ -169,6 +171,21 @@ export async function updateAccount(
   const { error } = await supabase
     .from("accounts")
     .update(patch)
+    .eq("id", accountId)
+    .filter(...scopeFilter(scope));
+
+  if (error) throw error;
+}
+
+/** Undoes archiveAccount. */
+export async function restoreAccount(
+  supabase: SupabaseClient<Database>,
+  scope: Scope,
+  accountId: string,
+): Promise<void> {
+  const { error } = await supabase
+    .from("accounts")
+    .update({ archived_at: null })
     .eq("id", accountId)
     .filter(...scopeFilter(scope));
 
