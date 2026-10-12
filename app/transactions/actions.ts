@@ -16,8 +16,13 @@ import {
   type TransactionType,
 } from "@/lib/db/transactions";
 import { toMinor } from "@/lib/money";
+import { isReceiptPathFor } from "@/lib/receipts";
 
 export type CreateTransactionActionInput = {
+  /** Client-generated id; required whenever `receiptPath` is set, because
+   * the photo was uploaded under this transaction's folder first. */
+  id?: string;
+  receiptPath?: string;
   type: TransactionType;
   accountId: string;
   /** Ignored (written as null) when type is "transfer". */
@@ -111,7 +116,16 @@ export async function createTransactionAction(
     const validated = validateTransactionInput(input);
     if ("error" in validated) return validated;
 
+    if (
+      input.receiptPath &&
+      !(input.id && isReceiptPathFor(input.receiptPath, user.id, input.id))
+    ) {
+      return { error: "Invalid receipt." };
+    }
+
     await createTransaction(supabase, user.id, {
+      id: input.id,
+      receiptPath: input.receiptPath ?? null,
       type: input.type,
       accountId: input.accountId,
       toAccountId: input.type === "transfer" ? input.toAccountId : null,

@@ -19,6 +19,8 @@ export type Transaction = {
   occurredOn: string;
   note: string | null;
   merchant: string | null;
+  /** Storage path of the receipt photo (see lib/receipts.ts), or null. */
+  receiptPath: string | null;
 };
 
 export type TransactionFilters = {
@@ -54,6 +56,12 @@ export type TransactionsPage = {
 };
 
 export type CreateTransactionInput = {
+  /** Client-chosen id, so a receipt photo can be uploaded under the
+   * transaction's own folder before the row exists. */
+  id?: string;
+  /** Path already uploaded for this transaction; the caller has verified it
+   * belongs to this user and id (isReceiptPathFor). */
+  receiptPath?: string | null;
   type: TransactionType;
   accountId: string;
   /** Transfer only - the destination account. Ignored for expense/income. */
@@ -82,6 +90,7 @@ function toTransaction(
     occurredOn: row.occurred_on,
     note: row.note,
     merchant: row.merchant,
+    receiptPath: row.receipt_url,
   };
 }
 
@@ -311,6 +320,7 @@ export async function createTransaction(
   if (accountError) throw accountError;
 
   const { error } = await supabase.from("transactions").insert({
+    ...(input.id ? { id: input.id } : {}),
     user_id: userId,
     type: input.type,
     account_id: input.accountId,
@@ -320,6 +330,7 @@ export async function createTransaction(
     currency: account.currency,
     occurred_on: input.occurredOn,
     note: input.note ?? null,
+    receipt_url: input.receiptPath ?? null,
   });
 
   if (error) throw error;

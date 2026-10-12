@@ -3,7 +3,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { format, parseISO } from "date-fns";
-import { ArrowDownIcon, ArrowUpIcon, ArrowUpDownIcon } from "lucide-react";
+import {
+  ArrowDownIcon,
+  ArrowUpIcon,
+  ArrowUpDownIcon,
+  PaperclipIcon,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Amount } from "@/components/ui/amount";
 import { cn } from "@/lib/utils";
@@ -430,13 +435,21 @@ function TransactionListResults({
                           }}
                         />
                         <span className="min-w-0 flex-1">
-                          <span className="block truncate text-sm">
-                            {category?.name ??
-                              (t.type === "transfer"
-                                ? "Transfer"
-                                : t.type === "adjustment"
-                                  ? "Balance adjustment"
-                                  : "Uncategorized")}
+                          <span className="flex items-center gap-1.5 text-sm">
+                            <span className="truncate">
+                              {category?.name ??
+                                (t.type === "transfer"
+                                  ? "Transfer"
+                                  : t.type === "adjustment"
+                                    ? "Balance adjustment"
+                                    : "Uncategorized")}
+                            </span>
+                            {t.receiptPath && (
+                              <PaperclipIcon
+                                className="size-3.5 shrink-0 text-muted-foreground"
+                                aria-label="Has a receipt photo"
+                              />
+                            )}
                           </span>
                           <span className="block truncate text-xs text-muted-foreground">
                             {transferAccountLabel(account?.name, t.type, t.toAccountId, accountById)}
@@ -535,13 +548,21 @@ function TransactionListResults({
                         style={{ backgroundColor: category?.color ?? "#94a3b8" }}
                       />
                       <span className="min-w-0 flex-1">
-                        <span className="block truncate">
-                          {category?.name ??
-                            (t.type === "transfer"
-                              ? "Transfer"
-                              : t.type === "adjustment"
-                                ? "Balance adjustment"
-                                : "Uncategorized")}
+                        <span className="flex items-center gap-1.5">
+                          <span className="truncate">
+                            {category?.name ??
+                              (t.type === "transfer"
+                                ? "Transfer"
+                                : t.type === "adjustment"
+                                  ? "Balance adjustment"
+                                  : "Uncategorized")}
+                          </span>
+                          {t.receiptPath && (
+                            <PaperclipIcon
+                              className="size-3.5 shrink-0 text-muted-foreground"
+                              aria-label="Has a receipt photo"
+                            />
+                          )}
                         </span>
                         {t.note && (
                           <span className="block truncate text-xs text-muted-foreground">

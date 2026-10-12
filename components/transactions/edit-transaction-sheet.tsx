@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   Sheet,
   SheetContent,
@@ -19,6 +20,11 @@ import {
   type TransactionType,
 } from "@/components/transactions/transaction-form-fields";
 import type { TransactionListItem } from "@/app/transactions/actions";
+import { ReceiptField } from "@/components/transactions/receipt-field";
+import {
+  attachReceiptAction,
+  removeReceiptAction,
+} from "@/app/transactions/receipt-actions";
 
 // Only reachable for expense/income rows (transaction-list.tsx disables
 // opening this sheet for transfer/adjustment), so toAccountId is always
@@ -55,6 +61,31 @@ function EditTransactionForm({
     amount: toDecimalString(BigInt(transaction.amount)),
   }));
   const [formError, setFormError] = useState<string | null>(null);
+  const [receiptPath, setReceiptPath] = useState<string | null>(
+    transaction.receiptPath,
+  );
+  const queryClient = useQueryClient();
+
+  // Receipt changes hit the database straight away rather than waiting for
+  // "Save changes": a photo is its own action, and saving the form must not
+  // be able to undo it.
+  async function attach(path: string) {
+    const result = await attachReceiptAction(transaction.id, path);
+    if (!result.error) {
+      setReceiptPath(path);
+      await queryClient.invalidateQueries({ queryKey: ["transactions"] });
+    }
+    return result;
+  }
+
+  async function remove() {
+    const result = await removeReceiptAction(transaction.id);
+    if (!result.error) {
+      setReceiptPath(null);
+      await queryClient.invalidateQueries({ queryKey: ["transactions"] });
+    }
+    return result;
+  }
 
   function submit() {
     if (!form.accountId) return setFormError("Choose an account.");
@@ -87,7 +118,14 @@ function EditTransactionForm({
         categories={categories}
         error={formError}
         allowedTypes={["expense", "income"]}
-      />
+      >
+        <ReceiptField
+          transactionId={transaction.id}
+          path={receiptPath}
+          onAttach={attach}
+          onRemove={remove}
+        />
+      </TransactionFormFields>
 
       <SheetFooter>
         <Button type="button" onClick={submit}>

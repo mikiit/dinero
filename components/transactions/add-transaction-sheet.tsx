@@ -21,6 +21,8 @@ import {
   type TransactionFormState,
 } from "@/components/transactions/transaction-form-fields";
 import { createTransactionAction } from "@/app/transactions/actions";
+import { ReceiptField } from "@/components/transactions/receipt-field";
+import { deleteUploadedReceipt } from "@/lib/receipts-client";
 
 function todayIso(): string {
   return format(new Date(), "yyyy-MM-dd");
@@ -57,6 +59,10 @@ export function AddTransactionSheet({
     emptyForm(accounts),
   );
   const [formError, setFormError] = useState<string | null>(null);
+  // The id is chosen here, not by the database, so a receipt photo can be
+  // uploaded under this transaction's own folder before the row exists.
+  const [transactionId, setTransactionId] = useState(() => crypto.randomUUID());
+  const [receiptPath, setReceiptPath] = useState<string | null>(null);
 
   const mutation = useMutation({ mutationFn: createTransactionAction });
 
@@ -88,7 +94,13 @@ export function AddTransactionSheet({
     }
     setFormError(null);
 
-    const payload = { ...form };
+    const payload = {
+      ...form,
+      id: transactionId,
+      receiptPath: receiptPath ?? undefined,
+    };
+    setTransactionId(crypto.randomUUID());
+    setReceiptPath(null);
     mutation.mutate(payload, {
       onSuccess: (result) => {
         if (result.error) onBackgroundError(result.error);
@@ -130,6 +142,12 @@ export function AddTransactionSheet({
       onOpenChange={(next) => {
         setOpen(next);
         if (next) setFormError(null);
+        else if (receiptPath) {
+          // Closed without saving: don't leave the uploaded photo behind.
+          void deleteUploadedReceipt(receiptPath);
+          setReceiptPath(null);
+          setTransactionId(crypto.randomUUID());
+        }
       }}
     >
       <SheetTrigger render={trigger ?? <Button size="lg" />}>
@@ -148,7 +166,23 @@ export function AddTransactionSheet({
           categories={categories}
           autoFocusAmount
           error={formError}
-        />
+        >
+          <ReceiptField
+            // Remounts after each save so "Save and add another" starts clean.
+            key={transactionId}
+            transactionId={transactionId}
+            path={receiptPath}
+            onAttach={async (path) => {
+              setReceiptPath(path);
+              return {};
+            }}
+            onRemove={async (path) => {
+              await deleteUploadedReceipt(path);
+              setReceiptPath(null);
+              return {};
+            }}
+          />
+        </TransactionFormFields>
 
         <SheetFooter className="flex-row">
           <Button
