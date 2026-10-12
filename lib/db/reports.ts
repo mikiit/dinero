@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/database.types";
+import type { Currency } from "@/lib/currency";
 import { fromDbAmount } from "@/lib/money";
 import {
   fillMonthSeries,
@@ -13,18 +14,21 @@ import { scopeFilter, type Scope } from "@/lib/scope";
 
 const PAGE_SIZE = 1000;
 
-/** Income/expense for the 12 months ending at `endMonthIso`, from the
- * monthly_summary SQL view, zero-filled for empty months. */
+/** Income/expense in one currency for the 12 months ending at
+ * `endMonthIso`, from the monthly_summary SQL view, zero-filled for empty
+ * months. */
 export async function getMonthlySeries(
   supabase: SupabaseClient<Database>,
   scope: Scope,
   endMonthIso: string,
+  currency: Currency,
 ): Promise<MonthTotals[]> {
   const startMonth = shiftMonth(endMonthIso, -11);
   const { data, error } = await supabase
     .from("monthly_summary")
     .select("month, income, expense")
     .filter(...scopeFilter(scope))
+    .eq("currency", currency)
     .gte("month", startMonth)
     .lte("month", endMonthIso);
   if (error) throw error;
@@ -56,6 +60,7 @@ export async function getSpendBreakdown(
   supabase: SupabaseClient<Database>,
   scope: Scope,
   monthStartIso: string,
+  currency: Currency,
 ): Promise<SpendBreakdown> {
   const nextMonth = shiftMonth(monthStartIso, 1);
 
@@ -64,7 +69,7 @@ export async function getSpendBreakdown(
       .from("categories")
       .select("id, name, parent_id")
       .filter(...scopeFilter(scope)),
-    fetchMonthExpenses(supabase, scope, monthStartIso, nextMonth),
+    fetchMonthExpenses(supabase, scope, monthStartIso, nextMonth, currency),
   ]);
   if (categoriesRes.error) throw categoriesRes.error;
 
@@ -82,6 +87,7 @@ async function fetchMonthExpenses(
   scope: Scope,
   fromIso: string,
   toExclusiveIso: string,
+  currency: Currency,
 ): Promise<{ categoryId: string | null; amount: bigint }[]> {
   const out: { categoryId: string | null; amount: bigint }[] = [];
   for (let from = 0; ; from += PAGE_SIZE) {
@@ -90,6 +96,7 @@ async function fetchMonthExpenses(
       .select("id, category_id, amount")
       .filter(...scopeFilter(scope))
       .eq("type", "expense")
+      .eq("currency", currency)
       .is("deleted_at", null)
       .gte("occurred_on", fromIso)
       .lt("occurred_on", toExclusiveIso)

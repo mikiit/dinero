@@ -60,31 +60,49 @@ export function toDecimalString(minor: bigint): string {
   return `${sign}${whole}.${fraction.toString().padStart(2, "0")}`;
 }
 
-const RSD_FORMATTER = new Intl.NumberFormat("sr-RS", {
-  style: "currency",
-  currency: "RSD",
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2,
-});
+const FORMATTERS = new Map<string, Intl.NumberFormat>();
 
-/** Formats bigint minor units as an sr-RS RSD string, e.g. "1.234,56 RSD". */
+function formatterFor(currency: string): Intl.NumberFormat {
+  let f = FORMATTERS.get(currency);
+  if (!f) {
+    f = new Intl.NumberFormat("sr-RS", {
+      style: "currency",
+      currencyDisplay: "code",
+      currency,
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+    FORMATTERS.set(currency, f);
+  }
+  return f;
+}
+
+/** Formats bigint minor units in an sr-RS currency string, e.g.
+ * "1.234,56 RSD" or "1.234,56 EUR". */
+export function formatMoney(minor: bigint, currency = "RSD"): string {
+  return formatterFor(currency).format(fromMinor(minor));
+}
+
+/** formatMoney for RSD - the default currency. */
 export function formatRSD(minor: bigint): string {
-  return RSD_FORMATTER.format(fromMinor(minor));
+  return formatMoney(minor, "RSD");
 }
 
 /**
- * Splits a formatted RSD amount into its number and currency-unit parts
+ * Splits a formatted amount into its number and currency-unit parts
  * (e.g. "1.234,56" and "RSD"), for display contexts where the number needs
  * to be the dominant visual element and the unit should read smaller and
  * de-emphasized rather than inheriting the number's size - see
  * components/ui/amount.tsx. Uses Intl's own part boundaries rather than
- * string-splitting formatRSD's output, so it stays correct if this ever
- * formats a currency other than RSD.
+ * string-splitting formatMoney's output.
  */
-export function formatRSDParts(minor: bigint): { number: string; unit: string } {
-  const parts = RSD_FORMATTER.formatToParts(fromMinor(minor));
+export function formatMoneyParts(
+  minor: bigint,
+  currency = "RSD",
+): { number: string; unit: string } {
+  const parts = formatterFor(currency).formatToParts(fromMinor(minor));
   let number = "";
-  let unit = "RSD";
+  let unit = currency;
   for (const part of parts) {
     if (part.type === "currency") {
       unit = part.value;
@@ -93,6 +111,11 @@ export function formatRSDParts(minor: bigint): { number: string; unit: string } 
     }
   }
   return { number, unit };
+}
+
+/** formatMoneyParts for RSD - the default currency. */
+export function formatRSDParts(minor: bigint): { number: string; unit: string } {
+  return formatMoneyParts(minor, "RSD");
 }
 
 // --- DB boundary -----------------------------------------------------------

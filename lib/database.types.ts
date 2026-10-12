@@ -98,6 +98,7 @@ export type Database = {
       }
       budgets: {
         Row: {
+          currency: string
           space_id: string | null
           amount: number
           category_id: string
@@ -107,6 +108,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          currency?: string
           space_id?: string | null
           amount: number
           category_id: string
@@ -116,6 +118,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          currency?: string
           space_id?: string | null
           amount?: number
           category_id?: string
@@ -355,6 +358,7 @@ export type Database = {
           recurring_id: string | null
           tags: string[] | null
           to_account_id: string | null
+          to_amount: number | null
           type: string
           user_id: string
         }
@@ -375,6 +379,7 @@ export type Database = {
           recurring_id?: string | null
           tags?: string[] | null
           to_account_id?: string | null
+          to_amount?: number | null
           type: string
           user_id: string
         }
@@ -395,6 +400,7 @@ export type Database = {
           recurring_id?: string | null
           tags?: string[] | null
           to_account_id?: string | null
+          to_amount?: number | null
           type?: string
           user_id?: string
         }
@@ -456,6 +462,7 @@ export type Database = {
       }
       monthly_summary: {
         Row: {
+          currency: string | null
           expense: number | null
           income: number | null
           month: string | null

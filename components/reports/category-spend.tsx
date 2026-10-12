@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 import { Amount } from "@/components/ui/amount";
-import { formatRSD, fromMinor } from "@/lib/money";
+import { formatMoney, fromMinor } from "@/lib/money";
 import { cn } from "@/lib/utils";
 import {
   formatShare,
@@ -86,8 +86,10 @@ export function CategorySpendChart({
   hrefs,
   previous = null,
   previousLabel = "last month",
+  currency = "RSD",
 }: {
   total: bigint;
+  currency?: string;
   items: CategorySpend[];
   /** Pre-built drill-down links, aligned with `items` by index. */
   hrefs: string[];
@@ -140,7 +142,7 @@ export function CategorySpendChart({
                   <div className="rounded-lg border bg-popover px-3 py-2 text-sm shadow-md">
                     <p className="font-medium">{row.name}</p>
                     <p className="font-mono text-xs">
-                      {formatRSD(row.total)} · {formatShare(row.shareBp)}
+                      {formatMoney(row.total, currency)} · {formatShare(row.shareBp)}
                     </p>
                   </div>
                 );
@@ -150,7 +152,7 @@ export function CategorySpendChart({
         </ResponsiveContainer>
         <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
           <span className="text-xs text-muted-foreground">Spent</span>
-          <Amount value={total} size="md" tone="neutral" showUnit={false} />
+          <Amount value={total} currency={currency} size="md" tone="neutral" showUnit={false} />
           <ChangeBadge change={totalChange} versus={previousLabel} />
         </div>
       </div>
@@ -175,7 +177,7 @@ export function CategorySpendChart({
                 {formatShare(r.shareBp)}
               </span>
               <ChangeBadge change={r.change} versus={previousLabel} />
-              <Amount value={r.total} size="sm" tone="neutral" showUnit={false} />
+              <Amount value={r.total} currency={currency} size="sm" tone="neutral" showUnit={false} />
             </>
           );
           return (

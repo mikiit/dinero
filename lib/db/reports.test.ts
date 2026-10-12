@@ -119,7 +119,7 @@ describe.skipIf(!hasCredentials)("reports data layer (live)", () => {
   const EXPECTED_MARCH = 175400n;
 
   it("breakdown rolls children into parents and counts only March expenses", async () => {
-    const r = await getSpendBreakdown(client, personalScope(userId), MONTH);
+    const r = await getSpendBreakdown(client, personalScope(userId), MONTH, "RSD");
     expect(r.total).toBe(EXPECTED_MARCH);
     expect(r.items.map((i) => [i.name, i.total])).toEqual([
       ["Food", 105100n], // 1001*100 (Groceries) + 5000 (Food)
@@ -129,8 +129,8 @@ describe.skipIf(!hasCredentials)("reports data layer (live)", () => {
   }, 60000);
 
   it("breakdown total equals the SQL monthly_summary expense for that month", async () => {
-    const breakdown = await getSpendBreakdown(client, personalScope(userId), MONTH);
-    const series = await getMonthlySeries(client, personalScope(userId), MONTH);
+    const breakdown = await getSpendBreakdown(client, personalScope(userId), MONTH, "RSD");
+    const series = await getMonthlySeries(client, personalScope(userId), MONTH, "RSD");
     const march = series[series.length - 1];
     expect(march.month).toBe(MONTH);
     expect(breakdown.total).toBe(march.expense);
@@ -138,7 +138,7 @@ describe.skipIf(!hasCredentials)("reports data layer (live)", () => {
   }, 60000);
 
   it("12-month series is contiguous and zero-filled", async () => {
-    const series = await getMonthlySeries(client, personalScope(userId), "2026-06-01");
+    const series = await getMonthlySeries(client, personalScope(userId), "2026-06-01", "RSD");
     expect(series).toHaveLength(12);
     expect(series[0].month).toBe("2025-07-01");
     const feb = series.find((m) => m.month === "2026-02-01")!;

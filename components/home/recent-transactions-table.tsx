@@ -9,6 +9,7 @@ import type { Account } from "@/lib/db/accounts";
 import type { Category } from "@/lib/db/categories";
 import type { Transaction } from "@/lib/db/transactions";
 import { NoTransactionsYet } from "@/components/home/no-transactions-yet";
+import { DEFAULT_CURRENCY } from "@/lib/currency";
 
 /** Desktop counterpart to RecentTransactionsList - same data, same
  * Amount/TransactionTypeIcon primitives, but a real <table> instead of a
@@ -78,10 +79,11 @@ export function RecentTransactionsTable({
                   <TransactionTypeIcon type={t.type} />
                   <Amount
                     value={signedAmount}
+                currency={t.currency}
                     size="sm"
                     tone={transactionAmountTone(t.type)}
                     showSign={isIncome || t.type === "adjustment"}
-                    showUnit={false}
+                    showUnit={t.currency !== DEFAULT_CURRENCY}
                   />
                 </span>
               </td>

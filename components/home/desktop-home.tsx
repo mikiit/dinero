@@ -1,11 +1,12 @@
 import Link from "next/link";
 import { NetWorthCard } from "@/components/home/net-worth-card";
-import { MonthSummary } from "@/components/home/month-summary";
+import { MonthSummaries } from "@/components/home/month-summaries";
 import { AccountsPanel } from "@/components/home/accounts-panel";
 import { RecentTransactionsTable } from "@/components/home/recent-transactions-table";
 import type { Account } from "@/lib/db/accounts";
 import type { Category } from "@/lib/db/categories";
 import type { Transaction } from "@/lib/db/transactions";
+import type { MonthlySummary } from "@/lib/db/transactions";
 
 /**
  * Genuinely different from MobileHome, not the same stack widened: two
@@ -23,7 +24,7 @@ export function DesktopHome({
   accounts: Account[];
   categories: Category[];
   recentTransactions: Transaction[];
-  monthlySummary: { income: bigint; expense: bigint };
+  monthlySummary: MonthlySummary[];
   canWrite?: boolean;
 }) {
   return (
@@ -53,10 +54,7 @@ export function DesktopHome({
       <div className="space-y-6">
         <div>
           <h2 className="mb-3 text-sm font-medium">This month</h2>
-          <MonthSummary
-            income={monthlySummary.income}
-            expense={monthlySummary.expense}
-          />
+          <MonthSummaries summaries={monthlySummary} />
         </div>
 
         <div>

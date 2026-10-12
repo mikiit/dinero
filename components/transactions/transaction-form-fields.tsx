@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/select";
 import type { Account } from "@/lib/db/accounts";
 import type { Category, CategoryKind } from "@/lib/db/categories";
+import { toCurrency } from "@/lib/currency";
 
 export type TransactionType = "expense" | "income" | "transfer";
 
@@ -46,6 +47,9 @@ export type TransactionFormState = {
   toAccountId: string;
   categoryId: string;
   amount: string;
+  /** Transfer between accounts of different currencies only: what arrives
+   * in the destination account. Unused (and ignored) otherwise. */
+  toAmount?: string;
   occurredOn: string;
   note: string;
 };
@@ -59,6 +63,7 @@ export function TransactionFormFields({
   error,
   allowedTypes = TRANSACTION_TYPES,
   dateLabel = "Date",
+  sameCurrencyTransfersOnly = false,
   children,
 }: {
   state: TransactionFormState;
@@ -75,6 +80,9 @@ export function TransactionFormFields({
   allowedTypes?: TransactionType[];
   /** Recurring rules reuse this form and call the date "Next date". */
   dateLabel?: string;
+  /** Recurring rules cannot know the amount that will arrive in another
+   * currency, so they only offer destinations in the source's currency. */
+  sameCurrencyTransfersOnly?: boolean;
   /** Extra fields rendered inside the scrolling area, below the note. */
   children?: React.ReactNode;
 }) {
@@ -82,7 +90,18 @@ export function TransactionFormFields({
   const categoryOptions = isTransfer
     ? []
     : buildCategoryOptions(categories, state.type as CategoryKind);
-  const toAccountOptions = accounts.filter((a) => a.id !== state.accountId);
+  const fromAccount = accounts.find((a) => a.id === state.accountId);
+  const toAccount = accounts.find((a) => a.id === state.toAccountId);
+  const toAccountOptions = accounts.filter(
+    (a) =>
+      a.id !== state.accountId &&
+      (!sameCurrencyTransfersOnly || a.currency === fromAccount?.currency),
+  );
+  const crossCurrency =
+    isTransfer &&
+    fromAccount !== undefined &&
+    toAccount !== undefined &&
+    fromAccount.currency !== toAccount.currency;
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-4">
@@ -101,7 +120,10 @@ export function TransactionFormFields({
       </div>
 
       <div className="space-y-1.5">
-        <Label htmlFor="amount">Amount</Label>
+        <Label htmlFor="amount">
+          {crossCurrency ? "Amount sent" : "Amount"}
+          {fromAccount ? ` (${toCurrency(fromAccount.currency)})` : ""}
+        </Label>
         <Input
           id="amount"
           inputMode="decimal"
@@ -139,7 +161,7 @@ export function TransactionFormFields({
           <SelectContent>
             {accounts.map((a) => (
               <SelectItem key={a.id} value={a.id}>
-                {a.name}
+                {a.name} · {a.currency}
               </SelectItem>
             ))}
           </SelectContent>
@@ -164,7 +186,7 @@ export function TransactionFormFields({
             <SelectContent>
               {toAccountOptions.map((a) => (
                 <SelectItem key={a.id} value={a.id}>
-                  {a.name}
+                  {a.name} · {a.currency}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -193,6 +215,26 @@ export function TransactionFormFields({
               ))}
             </SelectContent>
           </Select>
+        </div>
+      )}
+
+      {crossCurrency && toAccount && (
+        <div className="space-y-1.5">
+          <Label htmlFor="toAmount">
+            Amount received ({toCurrency(toAccount.currency)})
+          </Label>
+          <Input
+            id="toAmount"
+            inputMode="decimal"
+            placeholder="0"
+            className="font-mono tabular-nums"
+            value={state.toAmount ?? ""}
+            onChange={(e) => onChange({ toAmount: e.target.value })}
+          />
+          <p className="text-xs text-muted-foreground">
+            The two accounts are in different currencies, so enter what actually
+            arrived.
+          </p>
         </div>
       )}
 

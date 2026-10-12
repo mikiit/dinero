@@ -1,6 +1,9 @@
 import { endOfMonth, format, parseISO, startOfMonth } from "date-fns";
 import { getMonthlySeries, getSpendBreakdown } from "@/lib/db/reports";
+import { listAccounts } from "@/lib/db/accounts";
 import { listCategories } from "@/lib/db/categories";
+import { currenciesInUse, isCurrency } from "@/lib/currency";
+import { CurrencyTabs } from "@/components/reports/currency-tabs";
 import { listBudgets } from "@/lib/db/budgets";
 import { budgetProgress } from "@/lib/budgets";
 import { monthKey, parseMonthParam, shiftMonth } from "@/lib/reports";
@@ -18,9 +21,9 @@ import { redirect } from "next/navigation";
 export default async function ReportsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ m?: string }>;
+  searchParams: Promise<{ m?: string; c?: string }>;
 }) {
-  const { m } = await searchParams;
+  const { m, c } = await searchParams;
 
   const ctx = await getContext();
 
@@ -33,13 +36,22 @@ export default async function ReportsPage({
   const requested = parseMonthParam(m);
   const month = requested && requested <= currentMonth ? requested : currentMonth;
 
+  // Everything on this page is in ONE currency; amounts of different
+  // currencies are never combined, so the person picks which to look at.
+  const accounts = await listAccounts(supabase, scope);
+  const currencies = currenciesInUse([
+    ...accounts.map((a) => a.currency),
+    ...(isCurrency(c) ? [c] : []),
+  ]);
+  const currency = isCurrency(c) ? c : currencies[0];
+
   const previousMonth = shiftMonth(month, -1);
   const [series, spend, previousSpend, categories, budgets] = await Promise.all([
-    getMonthlySeries(supabase, scope, month),
-    getSpendBreakdown(supabase, scope, month),
-    getSpendBreakdown(supabase, scope, previousMonth),
+    getMonthlySeries(supabase, scope, month, currency),
+    getSpendBreakdown(supabase, scope, month, currency),
+    getSpendBreakdown(supabase, scope, previousMonth, currency),
     listCategories(supabase, scope),
-    listBudgets(supabase, scope, month),
+    listBudgets(supabase, scope, month, currency),
   ]);
   const selected = series[series.length - 1];
 
@@ -88,16 +100,32 @@ export default async function ReportsPage({
     <main className="mx-auto max-w-md space-y-6 p-4 lg:max-w-5xl lg:p-8">
       <h1 className="font-heading text-xl font-medium">Reports</h1>
 
-      <MonthNav monthStartIso={month} currentMonthStartIso={currentMonth} />
+      <MonthNav
+        monthStartIso={month}
+        currentMonthStartIso={currentMonth}
+        currency={currency}
+      />
 
-      <MonthSummary income={selected.income} expense={selected.expense} />
+      <CurrencyTabs
+        currencies={currencies}
+        selected={currency}
+        monthStartIso={month}
+        basePath="/reports"
+      />
+
+      <MonthSummary
+        income={selected.income}
+        expense={selected.expense}
+        currency={currency}
+      />
 
       <section className="space-y-3">
         <h2 className="text-sm font-medium text-muted-foreground">Budgets</h2>
         <BudgetProgressList
           total={totalRow}
           rows={budgetRows}
-          editHref={`/budgets?m=${monthKey(month)}`}
+          editHref={`/budgets?m=${monthKey(month)}&c=${currency}`}
+          currency={currency}
         />
       </section>
 
@@ -113,6 +141,7 @@ export default async function ReportsPage({
             hrefs={hrefs}
             previous={previousSpend}
             previousLabel={format(parseISO(previousMonth), "MMMM")}
+            currency={currency}
           />
         </section>
 
@@ -120,7 +149,7 @@ export default async function ReportsPage({
           <h2 className="text-sm font-medium text-muted-foreground">
             Income vs. expense, last 12 months
           </h2>
-          <CashFlowChart series={series} selectedMonthIso={month} />
+          <CashFlowChart series={series} selectedMonthIso={month} currency={currency} />
         </section>
       </div>
     </main>

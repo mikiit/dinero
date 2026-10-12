@@ -1,20 +1,24 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/database.types";
+import type { Currency } from "@/lib/currency";
 import { fromDbAmount, toDbAmount } from "@/lib/money";
 import { shiftMonth } from "@/lib/reports";
 import { scopeColumns, scopeFilter, type Scope } from "@/lib/scope";
 
-/** categoryId -> budget amount for one month (first-of-month ISO date). */
+/** categoryId -> budget amount for one month (first-of-month ISO date) in
+ * one currency. */
 export async function listBudgets(
   supabase: SupabaseClient<Database>,
   scope: Scope,
   monthStartIso: string,
+  currency: Currency,
 ): Promise<Map<string, bigint>> {
   const { data, error } = await supabase
     .from("budgets")
     .select("category_id, amount")
     .filter(...scopeFilter(scope))
-    .eq("period_month", monthStartIso);
+    .eq("period_month", monthStartIso)
+    .eq("currency", currency);
   if (error) throw error;
   return new Map(
     (data ?? []).map((b) => [b.category_id, fromDbAmount(b.amount)]),
@@ -52,6 +56,7 @@ async function updateExistingBudget(
   scope: Scope,
   categoryId: string,
   monthStartIso: string,
+  currency: Currency,
   amount: bigint,
 ): Promise<boolean> {
   const { data, error } = await supabase
@@ -60,6 +65,7 @@ async function updateExistingBudget(
     .filter(...scopeFilter(scope))
     .eq("category_id", categoryId)
     .eq("period_month", monthStartIso)
+    .eq("currency", currency)
     .select("id");
   if (error) throw error;
   return data.length > 0;
@@ -81,12 +87,13 @@ export async function setBudget(
   scope: Scope,
   categoryId: string,
   monthStartIso: string,
+  currency: Currency,
   amount: bigint,
 ): Promise<void> {
   if (amount < 0n) throw new Error("Budget cannot be negative.");
   await assertBudgetableCategory(supabase, scope, categoryId);
 
-  if (await updateExistingBudget(supabase, scope, categoryId, monthStartIso, amount)) {
+  if (await updateExistingBudget(supabase, scope, categoryId, monthStartIso, currency, amount)) {
     return;
   }
 
@@ -94,12 +101,13 @@ export async function setBudget(
     ...scopeColumns(scope),
     category_id: categoryId,
     period_month: monthStartIso,
+    currency,
     amount: toDbAmount(amount),
   });
   if (!error) return;
   if (error.code !== UNIQUE_VIOLATION) throw error;
 
-  await updateExistingBudget(supabase, scope, categoryId, monthStartIso, amount);
+  await updateExistingBudget(supabase, scope, categoryId, monthStartIso, currency, amount);
 }
 
 /** Removes a budget. budgets has no deleted_at (it's a setting, not ledger
@@ -109,13 +117,15 @@ export async function clearBudget(
   scope: Scope,
   categoryId: string,
   monthStartIso: string,
+  currency: Currency,
 ): Promise<void> {
   const { error } = await supabase
     .from("budgets")
     .delete()
     .filter(...scopeFilter(scope))
     .eq("category_id", categoryId)
-    .eq("period_month", monthStartIso);
+    .eq("period_month", monthStartIso)
+    .eq("currency", currency);
   if (error) throw error;
 }
 
@@ -128,10 +138,11 @@ export async function copyPreviousMonthBudgets(
   supabase: SupabaseClient<Database>,
   scope: Scope,
   monthStartIso: string,
+  currency: Currency,
 ): Promise<number> {
   const [previous, current] = await Promise.all([
-    listBudgets(supabase, scope, shiftMonth(monthStartIso, -1)),
-    listBudgets(supabase, scope, monthStartIso),
+    listBudgets(supabase, scope, shiftMonth(monthStartIso, -1), currency),
+    listBudgets(supabase, scope, monthStartIso, currency),
   ]);
 
   const rows = [...previous.entries()]
@@ -140,6 +151,7 @@ export async function copyPreviousMonthBudgets(
       ...scopeColumns(scope),
       category_id: categoryId,
       period_month: monthStartIso,
+      currency,
       amount: toDbAmount(amount),
     }));
   if (rows.length === 0) return 0;

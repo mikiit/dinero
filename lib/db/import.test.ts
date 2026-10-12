@@ -176,9 +176,9 @@ describe.skipIf(!hasCredentials)("transactions CSV import (live)", () => {
   it("rejects rows naming accounts or categories the user lacks", async () => {
     const csv = [
       TRANSACTION_CSV_HEADERS.join(","),
-      "2026-02-01,expense,Wallet,,Food > Groceries,1.00,RSD,,ok",
-      "2026-02-01,expense,Ghost,,,1.00,RSD,,bad account",
-      "2026-02-01,expense,Wallet,,Nope,1.00,RSD,,bad category",
+      "2026-02-01,expense,Wallet,,Food > Groceries,1.00,RSD,,,ok",
+      "2026-02-01,expense,Ghost,,,1.00,RSD,,,bad account",
+      "2026-02-01,expense,Wallet,,Nope,1.00,RSD,,,bad category",
     ].join("\r\n");
     const plan = await planImportForUser(b.client, personalScope(b.id), csv);
     expect(plan.toInsert).toHaveLength(1);

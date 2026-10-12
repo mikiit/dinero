@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Amount } from "@/components/ui/amount";
-import { formatRSD } from "@/lib/money";
+import { formatMoney } from "@/lib/money";
 import type { BudgetProgress } from "@/lib/budgets";
 import { cn } from "@/lib/utils";
 
@@ -18,10 +18,10 @@ const FILL: Record<BudgetProgress["status"], string> = {
 
 /** Status is always spelled out in text beside the bar, so color is never
  * the only signal (colorblind readers, grayscale prints). */
-function statusText(p: BudgetProgress): string {
-  if (p.status === "over") return `Over by ${formatRSD(-p.remaining)}`;
-  const left = `${formatRSD(p.remaining)} left`;
-  return p.perDay !== null ? `${left} · ${formatRSD(p.perDay)}/day` : left;
+function statusText(p: BudgetProgress, currency: string): string {
+  if (p.status === "over") return `Over by ${formatMoney(-p.remaining, currency)}`;
+  const left = `${formatMoney(p.remaining, currency)} left`;
+  return p.perDay !== null ? `${left} · ${formatMoney(p.perDay, currency)}/day` : left;
 }
 
 function Bar({ progress }: { progress: BudgetProgress }) {
@@ -46,7 +46,15 @@ function Bar({ progress }: { progress: BudgetProgress }) {
   );
 }
 
-function Row({ row, emphasis }: { row: BudgetProgressRow; emphasis?: boolean }) {
+function Row({
+  row,
+  emphasis,
+  currency,
+}: {
+  row: BudgetProgressRow;
+  emphasis?: boolean;
+  currency: string;
+}) {
   const { progress } = row;
   return (
     <li className={cn("space-y-1.5 p-3", emphasis && "bg-muted/40")}>
@@ -55,9 +63,9 @@ function Row({ row, emphasis }: { row: BudgetProgressRow; emphasis?: boolean }) 
           {row.name}
         </span>
         <span className="flex shrink-0 items-baseline gap-1 text-xs text-muted-foreground">
-          <Amount value={progress.spent} size="sm" tone="neutral" showUnit={false} />
+          <Amount value={progress.spent} currency={currency} size="sm" tone="neutral" showUnit={false} />
           of
-          <Amount value={progress.budget} size="sm" tone="muted" showUnit={false} />
+          <Amount value={progress.budget} currency={currency} size="sm" tone="muted" showUnit={false} />
         </span>
       </div>
       <Bar progress={progress} />
@@ -67,7 +75,7 @@ function Row({ row, emphasis }: { row: BudgetProgressRow; emphasis?: boolean }) 
           progress.status === "over" ? "text-expense" : "text-muted-foreground",
         )}
       >
-        {statusText(progress)}
+        {statusText(progress, currency)}
       </p>
     </li>
   );
@@ -77,10 +85,12 @@ export function BudgetProgressList({
   total,
   rows,
   editHref,
+  currency,
 }: {
   total: BudgetProgressRow | null;
   rows: BudgetProgressRow[];
   editHref: string;
+  currency: string;
 }) {
   if (rows.length === 0) {
     return (
@@ -96,9 +106,9 @@ export function BudgetProgressList({
   return (
     <div className="space-y-2">
       <ul className="divide-y rounded-lg border">
-        {total && <Row row={total} emphasis />}
+        {total && <Row row={total} emphasis currency={currency} />}
         {rows.map((row) => (
-          <Row key={row.key} row={row} />
+          <Row key={row.key} row={row} currency={currency} />
         ))}
       </ul>
       <Link

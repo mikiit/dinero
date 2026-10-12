@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/database.types";
+import { CURRENCIES, DEFAULT_CURRENCY, toCurrency, type Currency } from "@/lib/currency";
 import { fromDbAmount, toDbAmount } from "@/lib/money";
 import { scopeColumns, scopeFilter, type Scope } from "@/lib/scope";
 
@@ -15,8 +16,13 @@ export type Transaction = {
   accountId: string;
   toAccountId: string | null;
   categoryId: string | null;
+  /** In the currency of `accountId`. */
   amount: bigint;
   currency: string;
+  /** Cross-currency transfer only: what arrived in `toAccountId`, in that
+   * account's currency. Null for every other row, including a transfer
+   * between two accounts of the same currency (it arrived as `amount`). */
+  toAmount: bigint | null;
   occurredOn: string;
   note: string | null;
   merchant: string | null;
@@ -71,6 +77,10 @@ export type CreateTransactionInput = {
    * passed here, matching the category_only_for_expense_income DB check. */
   categoryId?: string | null;
   amount: bigint;
+  /** Transfer between accounts of different currencies only: the amount
+   * that arrives, in the destination account's currency. Required then,
+   * ignored otherwise. */
+  toAmount?: bigint | null;
   occurredOn: string;
   note?: string | null;
 };
@@ -88,6 +98,7 @@ function toTransaction(
     categoryId: row.category_id,
     amount: fromDbAmount(row.amount),
     currency: row.currency,
+    toAmount: row.to_amount === null ? null : fromDbAmount(row.to_amount),
     occurredOn: row.occurred_on,
     note: row.note,
     merchant: row.merchant,
@@ -297,10 +308,48 @@ export async function listTransactionsPage(
 }
 
 /**
- * Inserts a single expense/income/transfer transaction. currency is looked
- * up from the source account rather than trusted from the caller - accounts
- * are always RSD today (no currency picker exists yet, SPEC.md Phase 3), but
- * this stays correct once that changes instead of silently hardcoding it.
+ * Works out the currency (and, for a transfer between currencies, the
+ * received amount) a transaction is written with. Currency is looked up from
+ * the source account rather than trusted from the caller. A transfer between
+ * two accounts of the same currency has no separate received amount; between
+ * different currencies the caller must supply it - there is no rate lookup,
+ * the person says how much arrived.
+ */
+async function resolveLegs(
+  supabase: SupabaseClient<Database>,
+  scope: Scope,
+  input: CreateTransactionInput,
+): Promise<{ currency: string; toAmount: bigint | null }> {
+  const ids = [
+    input.accountId,
+    ...(input.type === "transfer" && input.toAccountId ? [input.toAccountId] : []),
+  ];
+  const { data, error } = await supabase
+    .from("accounts")
+    .select("id, currency")
+    .filter(...scopeFilter(scope))
+    .in("id", ids);
+  if (error) throw error;
+
+  const currencyById = new Map((data ?? []).map((a) => [a.id, a.currency]));
+  const currency = currencyById.get(input.accountId);
+  if (currency === undefined) throw new Error("Account not found.");
+
+  if (input.type !== "transfer") return { currency, toAmount: null };
+
+  const toCurrencyCode = input.toAccountId ? currencyById.get(input.toAccountId) : undefined;
+  if (toCurrencyCode === undefined) throw new Error("Destination account not found.");
+  if (toCurrencyCode === currency) return { currency, toAmount: null };
+
+  if (input.toAmount == null || input.toAmount <= 0n) {
+    throw new Error(`Enter the amount received in ${toCurrencyCode}.`);
+  }
+  return { currency, toAmount: input.toAmount };
+}
+
+/**
+ * Inserts a single expense/income/transfer transaction (currency per
+ * resolveLegs).
  * For a transfer, the `transactions` table's own CHECK constraints
  * (transfer_requires_to_account, transfer_not_to_self,
  * category_only_for_expense_income) are the last line of defense if a
@@ -311,14 +360,7 @@ export async function createTransaction(
   scope: Scope,
   input: CreateTransactionInput,
 ): Promise<void> {
-  const { data: account, error: accountError } = await supabase
-    .from("accounts")
-    .select("currency")
-    .eq("id", input.accountId)
-    .filter(...scopeFilter(scope))
-    .single();
-
-  if (accountError) throw accountError;
+  const legs = await resolveLegs(supabase, scope, input);
 
   const { error } = await supabase.from("transactions").insert({
     ...(input.id ? { id: input.id } : {}),
@@ -328,7 +370,8 @@ export async function createTransaction(
     to_account_id: input.type === "transfer" ? (input.toAccountId ?? null) : null,
     category_id: input.type === "transfer" ? null : (input.categoryId ?? null),
     amount: toDbAmount(input.amount),
-    currency: account.currency,
+    currency: legs.currency,
+    to_amount: legs.toAmount === null ? null : toDbAmount(legs.toAmount),
     occurred_on: input.occurredOn,
     note: input.note ?? null,
     receipt_url: input.receiptPath ?? null,
@@ -343,14 +386,7 @@ export async function updateTransaction(
   transactionId: string,
   input: UpdateTransactionInput,
 ): Promise<void> {
-  const { data: account, error: accountError } = await supabase
-    .from("accounts")
-    .select("currency")
-    .eq("id", input.accountId)
-    .filter(...scopeFilter(scope))
-    .single();
-
-  if (accountError) throw accountError;
+  const legs = await resolveLegs(supabase, scope, input);
 
   const { error } = await supabase
     .from("transactions")
@@ -360,7 +396,8 @@ export async function updateTransaction(
       to_account_id: input.type === "transfer" ? (input.toAccountId ?? null) : null,
       category_id: input.type === "transfer" ? null : (input.categoryId ?? null),
       amount: toDbAmount(input.amount),
-      currency: account.currency,
+      currency: legs.currency,
+      to_amount: legs.toAmount === null ? null : toDbAmount(legs.toAmount),
       occurred_on: input.occurredOn,
       note: input.note ?? null,
     })
@@ -425,6 +462,7 @@ export async function listRecentTransactions(
 }
 
 export type MonthlySummary = {
+  currency: Currency;
   income: bigint;
   expense: bigint;
 };
@@ -439,20 +477,30 @@ export async function getMonthlySummary(
   supabase: SupabaseClient<Database>,
   scope: Scope,
   monthIso: string,
-): Promise<MonthlySummary> {
+): Promise<MonthlySummary[]> {
   const { data, error } = await supabase
     .from("monthly_summary")
-    .select("income, expense")
+    .select("currency, income, expense")
     .filter(...scopeFilter(scope))
-    .eq("month", monthIso)
-    .maybeSingle();
+    .eq("month", monthIso);
 
   if (error) throw error;
 
-  return {
-    income: fromDbAmount(data?.income ?? 0),
-    expense: fromDbAmount(data?.expense ?? 0),
-  };
+  // One entry per currency with activity this month, never added together.
+  // A month with nothing still shows a zero row, so Home keeps its shape.
+  const byCurrency = new Map<Currency, MonthlySummary>();
+  for (const r of data ?? []) {
+    const currency = toCurrency(r.currency);
+    byCurrency.set(currency, {
+      currency,
+      income: fromDbAmount(r.income ?? 0),
+      expense: fromDbAmount(r.expense ?? 0),
+    });
+  }
+  const rows = CURRENCIES.flatMap((c) => byCurrency.get(c) ?? []);
+  return rows.length > 0
+    ? rows
+    : [{ currency: DEFAULT_CURRENCY, income: 0n, expense: 0n }];
 }
 
 /**

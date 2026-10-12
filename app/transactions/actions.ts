@@ -35,6 +35,9 @@ export type CreateTransactionActionInput = {
   /** Raw decimal string (e.g. "12,50") - parsed and validated here, never
    * trusted from the client beyond this point. */
   amount: string;
+  /** Transfer between accounts of different currencies only: the amount
+   * that arrives, as a raw decimal string. */
+  toAmount?: string;
   occurredOn: string;
   note?: string;
 };
@@ -49,14 +52,23 @@ export type TransactionActionResult = { error?: string };
  * the Server Action *argument* boundary - shouldn't be trusted with raw
  * bigint. amount travels as a string and gets turned back into bigint
  * client-side before it touches formatRSD/toMinor. */
-export type TransactionListItem = Omit<Transaction, "amount"> & {
+export type TransactionListItem = Omit<Transaction, "amount" | "toAmount"> & {
   amount: string;
+  toAmount: string | null;
 };
 
 export type ListTransactionsResult = {
   transactions: TransactionListItem[];
   nextCursor: TransactionsCursor;
 };
+
+function toListItem(t: Transaction): TransactionListItem {
+  return {
+    ...t,
+    amount: t.amount.toString(),
+    toAmount: t.toAmount === null ? null : t.toAmount.toString(),
+  };
+}
 
 function validateTransactionInput(input: {
   type: TransactionType;
@@ -65,7 +77,8 @@ function validateTransactionInput(input: {
   toAccountId?: string;
   occurredOn: string;
   amount: string;
-}): { error: string } | { amount: bigint } {
+  toAmount?: string;
+}): { error: string } | { amount: bigint; toAmount: bigint | null } {
   if (!input.accountId) return { error: "Choose an account." };
   if (input.type === "transfer") {
     if (!input.toAccountId) return { error: "Choose a destination account." };
@@ -81,7 +94,16 @@ function validateTransactionInput(input: {
   if (amount <= 0n) {
     return { error: "Enter an amount greater than zero." };
   }
-  return { amount };
+  // Whether a received amount is needed depends on the two accounts'
+  // currencies, which only the DB layer looks up; here it is just parsed.
+  const toAmount =
+    input.type === "transfer" && input.toAmount?.trim()
+      ? toMinor(input.toAmount)
+      : null;
+  if (toAmount !== null && toAmount <= 0n) {
+    return { error: "Enter a received amount greater than zero." };
+  }
+  return { amount, toAmount };
 }
 
 export async function listTransactionsAction(
@@ -97,10 +119,7 @@ export async function listTransactionsAction(
 
   const page = await listTransactionsPage(supabase, scope, filters, cursor);
   return {
-    transactions: page.transactions.map((t) => ({
-      ...t,
-      amount: t.amount.toString(),
-    })),
+    transactions: page.transactions.map(toListItem),
     nextCursor: page.nextCursor,
   };
 }
@@ -131,6 +150,7 @@ export async function createTransactionAction(
       toAccountId: input.type === "transfer" ? input.toAccountId : null,
       categoryId: input.type === "transfer" ? null : input.categoryId,
       amount: validated.amount,
+      toAmount: validated.toAmount,
       occurredOn: input.occurredOn,
       note: input.note?.trim() || null,
     });
@@ -163,6 +183,7 @@ export async function updateTransactionAction(
       toAccountId: input.type === "transfer" ? input.toAccountId : null,
       categoryId: input.type === "transfer" ? null : input.categoryId,
       amount: validated.amount,
+      toAmount: validated.toAmount,
       occurredOn: input.occurredOn,
       note: input.note?.trim() || null,
     });
@@ -242,22 +263,26 @@ export async function listRecentTransactionsAction(
   const { supabase, scope } = gate.ctx;
 
   const transactions = await listRecentTransactions(supabase, scope, limit);
-  return transactions.map((t) => ({ ...t, amount: t.amount.toString() }));
+  return transactions.map(toListItem);
 }
 
-export type MonthlySummaryResult = { income: string; expense: string };
+export type MonthlySummaryResult = {
+  currency: string;
+  income: string;
+  expense: string;
+}[];
 
 export async function getMonthlySummaryAction(
   monthIso: string,
 ): Promise<MonthlySummaryResult> {
   const ctx = await getContext();
-  const gate = { ctx, error: "Not signed in." };
-  if (!gate.ctx) return { income: "0", expense: "0" };
-  const { supabase, scope } = gate.ctx;
+  if (!ctx) return [];
+  const { supabase, scope } = ctx;
 
   const summary = await getMonthlySummary(supabase, scope, monthIso);
-  return {
-    income: summary.income.toString(),
-    expense: summary.expense.toString(),
-  };
+  return summary.map((s) => ({
+    currency: s.currency,
+    income: s.income.toString(),
+    expense: s.expense.toString(),
+  }));
 }

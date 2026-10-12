@@ -13,6 +13,7 @@ import {
 import { createAdjustment } from "@/lib/db/transactions";
 import { toMinor } from "@/lib/money";
 import { requireWriteContext } from "@/lib/context";
+import { isCurrency, type Currency } from "@/lib/currency";
 
 export type AccountFormState =
   | { status: "idle" }
@@ -31,6 +32,11 @@ function parseAccountType(value: FormDataEntryValue | null): AccountType {
     return value as AccountType;
   }
   throw new Error(`Invalid account type: ${String(value)}`);
+}
+
+function parseCurrencyField(value: FormDataEntryValue | null): Currency {
+  if (isCurrency(value)) return value;
+  throw new Error(`Unsupported currency: ${String(value)}`);
 }
 
 function parseRequiredName(value: FormDataEntryValue | null): string {
@@ -76,6 +82,7 @@ export async function createAccountAction(
     await createAccount(supabase, scope, {
       name: parseRequiredName(formData.get("name")),
       type,
+      currency: parseCurrencyField(formData.get("currency")),
       openingBalance,
       creditLimit:
         type === "credit" ? parseOptionalMoney(formData.get("creditLimit")) : null,

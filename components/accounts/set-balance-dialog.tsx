@@ -88,7 +88,7 @@ export function SetBalanceDialog({ account }: { account: Account }) {
         <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-4">
           <div className="space-y-1.5">
             <Label htmlFor="targetBalance">
-              {isCredit ? "Owed" : "Balance"} (RSD)
+              {isCredit ? "Owed" : "Balance"} ({account.currency})
             </Label>
             <Input
               id="targetBalance"
@@ -115,12 +115,13 @@ export function SetBalanceDialog({ account }: { account: Account }) {
               <div className="space-y-1.5 rounded-lg bg-muted p-3 text-sm">
                 <p className="flex items-center justify-between">
                   <span className="text-muted-foreground">Current</span>
-                  <Amount value={displayedCurrent} size="sm" tone="neutral" />
+                  <Amount value={displayedCurrent} currency={account.currency} size="sm" tone="neutral" />
                 </p>
                 <p className="flex items-center justify-between">
                   <span className="text-muted-foreground">New</span>
                   <Amount
                     value={isCredit ? -parsedTarget : parsedTarget}
+                    currency={account.currency}
                     size="sm"
                     tone="neutral"
                   />
@@ -129,6 +130,7 @@ export function SetBalanceDialog({ account }: { account: Account }) {
                   <span>Adjustment</span>
                   <Amount
                     value={isCredit ? -delta : delta}
+                    currency={account.currency}
                     size="sm"
                     // Tone reflects whether the account's true balance
                     // improves (delta > 0), not the displayed sign - for a

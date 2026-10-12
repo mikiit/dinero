@@ -50,18 +50,18 @@ export function AccountList({
                     <>
                       <p className="text-xs text-muted-foreground">Owed</p>
                       <Amount
-                        value={owed}
+                        value={owed} currency={account.currency}
                         size="lg"
                         tone={owed > 0n ? "expense" : "neutral"}
                       />
                     </>
                   ) : (
-                    <Amount value={account.balance} size="lg" />
+                    <Amount value={account.balance} currency={account.currency} size="lg" />
                   )}
                   {isCredit && account.creditLimit != null && (
                     <p className="text-xs text-muted-foreground">
                       Limit{" "}
-                      <Amount value={account.creditLimit} size="sm" tone="muted" />
+                      <Amount value={account.creditLimit} currency={account.currency} size="sm" tone="muted" />
                     </p>
                   )}
                 </div>

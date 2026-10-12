@@ -113,6 +113,18 @@ export function AddTransactionSheet({
     } catch {
       return "Enter a valid amount.";
     }
+    if (form.type === "transfer") {
+      const from = accounts.find((a) => a.id === form.accountId);
+      const to = accounts.find((a) => a.id === form.toAccountId);
+      if (from && to && from.currency !== to.currency) {
+        try {
+          if (!form.toAmount?.trim()) return `Enter the amount received in ${to.currency}.`;
+          if (toMinor(form.toAmount) <= 0n) return "Enter a received amount greater than zero.";
+        } catch {
+          return "Enter a valid received amount.";
+        }
+      }
+    }
     if (!form.occurredOn) return "Choose a date.";
     return null;
   }
@@ -164,6 +176,7 @@ export function AddTransactionSheet({
       setForm((prev) => ({
         ...prev,
         amount: "",
+        toAmount: "",
         categoryId: "",
         toAccountId: "",
         note: "",

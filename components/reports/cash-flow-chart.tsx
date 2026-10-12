@@ -14,7 +14,7 @@ import {
   YAxis,
 } from "recharts";
 import { Button } from "@/components/ui/button";
-import { formatRSD, fromMinor } from "@/lib/money";
+import { formatMoney, fromMinor } from "@/lib/money";
 import { monthKey, type MonthTotals } from "@/lib/reports";
 
 function compact(major: number): string {
@@ -26,9 +26,11 @@ function compact(major: number): string {
 export function CashFlowChart({
   series,
   selectedMonthIso,
+  currency = "RSD",
 }: {
   series: MonthTotals[];
   selectedMonthIso: string;
+  currency?: string;
 }) {
   const router = useRouter();
   const [showTable, setShowTable] = useState(false);
@@ -79,8 +81,8 @@ export function CashFlowChart({
             {[...series].reverse().map((m) => (
               <tr key={m.month} className="border-b last:border-0">
                 <td className="py-2">{format(parseISO(m.month), "MMM yyyy")}</td>
-                <td className="py-2 text-right font-mono">{formatRSD(m.income)}</td>
-                <td className="py-2 text-right font-mono">{formatRSD(m.expense)}</td>
+                <td className="py-2 text-right font-mono">{formatMoney(m.income, currency)}</td>
+                <td className="py-2 text-right font-mono">{formatMoney(m.expense, currency)}</td>
               </tr>
             ))}
           </tbody>
@@ -125,10 +127,10 @@ export function CashFlowChart({
                         {format(parseISO(raw.month), "MMMM yyyy")}
                       </p>
                       <p className="font-mono text-xs text-income">
-                        Income {formatRSD(raw.income)}
+                        Income {formatMoney(raw.income, currency)}
                       </p>
                       <p className="font-mono text-xs text-expense">
-                        Expense {formatRSD(raw.expense)}
+                        Expense {formatMoney(raw.expense, currency)}
                       </p>
                     </div>
                   );

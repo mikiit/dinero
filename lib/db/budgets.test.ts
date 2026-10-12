@@ -71,9 +71,9 @@ describe.skipIf(!hasCredentials)("budgets data layer (live)", () => {
   }, 30000);
 
   it("setBudget is an idempotent upsert; clearBudget removes it", async () => {
-    await setBudget(a, personalScope(userA), foodId, SEP, 100000n);
-    await setBudget(a, personalScope(userA), foodId, SEP, 150000n); // second call updates
-    expect((await listBudgets(a, personalScope(userA), SEP)).get(foodId)).toBe(150000n);
+    await setBudget(a, personalScope(userA), foodId, SEP, "RSD", 100000n);
+    await setBudget(a, personalScope(userA), foodId, SEP, "RSD", 150000n); // second call updates
+    expect((await listBudgets(a, personalScope(userA), SEP, "RSD")).get(foodId)).toBe(150000n);
 
     const { count } = await a
       .from("budgets")
@@ -83,42 +83,42 @@ describe.skipIf(!hasCredentials)("budgets data layer (live)", () => {
       .eq("period_month", SEP);
     expect(count).toBe(1);
 
-    await clearBudget(a, personalScope(userA), foodId, SEP);
-    expect((await listBudgets(a, personalScope(userA), SEP)).has(foodId)).toBe(false);
+    await clearBudget(a, personalScope(userA), foodId, SEP, "RSD");
+    expect((await listBudgets(a, personalScope(userA), SEP, "RSD")).has(foodId)).toBe(false);
   }, 60000);
 
   it("accepts a zero budget but rejects negatives", async () => {
-    await setBudget(a, personalScope(userA), rentId, SEP, 0n);
-    expect((await listBudgets(a, personalScope(userA), SEP)).get(rentId)).toBe(0n);
-    await expect(setBudget(a, personalScope(userA), rentId, SEP, -1n)).rejects.toThrow(/negative/);
-    await clearBudget(a, personalScope(userA), rentId, SEP);
+    await setBudget(a, personalScope(userA), rentId, SEP, "RSD", 0n);
+    expect((await listBudgets(a, personalScope(userA), SEP, "RSD")).get(rentId)).toBe(0n);
+    await expect(setBudget(a, personalScope(userA), rentId, SEP, "RSD", -1n)).rejects.toThrow(/negative/);
+    await clearBudget(a, personalScope(userA), rentId, SEP, "RSD");
   }, 60000);
 
   it("only top-level expense categories can have a budget", async () => {
-    await expect(setBudget(a, personalScope(userA), salaryId, SEP, 100n)).rejects.toThrow(/expense/);
-    await expect(setBudget(a, personalScope(userA), groceriesId, SEP, 100n)).rejects.toThrow(/top-level/);
+    await expect(setBudget(a, personalScope(userA), salaryId, SEP, "RSD", 100n)).rejects.toThrow(/expense/);
+    await expect(setBudget(a, personalScope(userA), groceriesId, SEP, "RSD", 100n)).rejects.toThrow(/top-level/);
   }, 60000);
 
   it("copy-forward fills missing categories and never overwrites", async () => {
-    await setBudget(a, personalScope(userA), foodId, SEP, 50000n);
-    await setBudget(a, personalScope(userA), rentId, SEP, 70000n);
-    await setBudget(a, personalScope(userA), foodId, OCT, 99999n); // already set in the target
+    await setBudget(a, personalScope(userA), foodId, SEP, "RSD", 50000n);
+    await setBudget(a, personalScope(userA), rentId, SEP, "RSD", 70000n);
+    await setBudget(a, personalScope(userA), foodId, OCT, "RSD", 99999n); // already set in the target
 
-    const added = await copyPreviousMonthBudgets(a, personalScope(userA), OCT);
+    const added = await copyPreviousMonthBudgets(a, personalScope(userA), OCT, "RSD");
     expect(added).toBe(1); // only Rent
 
-    const oct = await listBudgets(a, personalScope(userA), OCT);
+    const oct = await listBudgets(a, personalScope(userA), OCT, "RSD");
     expect(oct.get(foodId)).toBe(99999n); // untouched
     expect(oct.get(rentId)).toBe(70000n);
 
-    expect(await copyPreviousMonthBudgets(a, personalScope(userA), OCT)).toBe(0); // idempotent
+    expect(await copyPreviousMonthBudgets(a, personalScope(userA), OCT, "RSD")).toBe(0); // idempotent
   }, 60000);
 
   it("another user sees none of these budgets, and cannot write to this user's categories", async () => {
-    expect((await listBudgets(b, personalScope(userB), SEP)).size).toBe(0);
-    expect((await listBudgets(b, personalScope(userB), OCT)).size).toBe(0);
+    expect((await listBudgets(b, personalScope(userB), SEP, "RSD")).size).toBe(0);
+    expect((await listBudgets(b, personalScope(userB), OCT, "RSD")).size).toBe(0);
     // Reading A's rows by A's id through B's session returns nothing (RLS).
-    expect((await listBudgets(b, personalScope(userA), SEP)).size).toBe(0);
-    await expect(setBudget(b, personalScope(userB), foodId, SEP, 1n)).rejects.toThrow();
+    expect((await listBudgets(b, personalScope(userA), SEP, "RSD")).size).toBe(0);
+    await expect(setBudget(b, personalScope(userB), foodId, SEP, "RSD", 1n)).rejects.toThrow();
   }, 60000);
 });

@@ -39,6 +39,7 @@ export default async function RecurringPage() {
       title: t.note ?? categoryName(t.categoryId) ?? (t.type === "transfer" ? "Transfer" : "Recurring"),
       type: t.type,
       amount: t.amount,
+      currency: accounts.find((a) => a.id === t.accountId)?.currency ?? "RSD",
       accountName: accountName(t.accountId),
       toAccountName: t.toAccountId ? accountName(t.toAccountId) : null,
       scheduleText: describeSchedule(scheduleOf(rule)),

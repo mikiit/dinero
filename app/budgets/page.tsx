@@ -1,5 +1,8 @@
 import { format, startOfMonth } from "date-fns";
+import { listAccounts } from "@/lib/db/accounts";
 import { listCategories } from "@/lib/db/categories";
+import { currenciesInUse, isCurrency } from "@/lib/currency";
+import { CurrencyTabs } from "@/components/reports/currency-tabs";
 import { listBudgets } from "@/lib/db/budgets";
 import { getSpendBreakdown } from "@/lib/db/reports";
 import { parseMonthParam } from "@/lib/reports";
@@ -11,9 +14,9 @@ import { redirect } from "next/navigation";
 export default async function BudgetsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ m?: string }>;
+  searchParams: Promise<{ m?: string; c?: string }>;
 }) {
-  const { m } = await searchParams;
+  const { m, c } = await searchParams;
 
   const ctx = await getContext();
 
@@ -26,10 +29,17 @@ export default async function BudgetsPage({
   const currentMonth = format(startOfMonth(new Date()), "yyyy-MM-dd");
   const month = parseMonthParam(m) ?? currentMonth;
 
+  const accounts = await listAccounts(supabase, scope);
+  const currencies = currenciesInUse([
+    ...accounts.map((a) => a.currency),
+    ...(isCurrency(c) ? [c] : []),
+  ]);
+  const currency = isCurrency(c) ? c : currencies[0];
+
   const [categories, budgets, spend] = await Promise.all([
     listCategories(supabase, scope),
-    listBudgets(supabase, scope, month),
-    getSpendBreakdown(supabase, scope, month),
+    listBudgets(supabase, scope, month, currency),
+    getSpendBreakdown(supabase, scope, month, currency),
   ]);
 
   const spentById = new Map(
@@ -54,9 +64,22 @@ export default async function BudgetsPage({
         currentMonthStartIso={currentMonth}
         basePath="/budgets"
         allowFuture
+        currency={currency}
       />
 
-      <BudgetEditor rows={rows} monthStartIso={month} readOnly={!ctx.canWrite} />
+      <CurrencyTabs
+        currencies={currencies}
+        selected={currency}
+        monthStartIso={month}
+        basePath="/budgets"
+      />
+
+      <BudgetEditor
+        rows={rows}
+        monthStartIso={month}
+        currency={currency}
+        readOnly={!ctx.canWrite}
+      />
     </main>
   );
 }

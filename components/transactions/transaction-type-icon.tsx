@@ -7,6 +7,7 @@ import {
 import { cn } from "@/lib/utils";
 import type { Account } from "@/lib/db/accounts";
 import type { AnyTransactionType } from "@/lib/db/transactions";
+import { formatMoney } from "@/lib/money";
 
 // A non-color signal for transaction type, so expense/income/transfer stay
 // distinct for colorblind users too (deuteranopia/protanopia both make
@@ -53,6 +54,19 @@ export function transferAccountLabel(
   const base = sourceAccountName ?? "Unknown account";
   if (type !== "transfer" || !toAccountId) return base;
   return `${base} → ${accountById.get(toAccountId)?.name ?? "Unknown account"}`;
+}
+
+/** For a transfer between currencies, what arrived on the other side
+ * (" · received 11.700,00 RSD"); empty for everything else. */
+export function transferReceivedLabel(
+  type: AnyTransactionType,
+  toAmount: bigint | string | null,
+  toAccountId: string | null,
+  accountById: Map<string, Account>,
+): string {
+  if (type !== "transfer" || toAmount === null || !toAccountId) return "";
+  const currency = accountById.get(toAccountId)?.currency ?? "RSD";
+  return ` · received ${formatMoney(BigInt(toAmount), currency)}`;
 }
 
 export function TransactionTypeIcon({

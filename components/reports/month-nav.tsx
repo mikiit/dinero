@@ -13,20 +13,24 @@ export function MonthNav({
   currentMonthStartIso,
   basePath = "/reports",
   allowFuture = false,
+  currency,
 }: {
   monthStartIso: string;
   currentMonthStartIso: string;
   basePath?: string;
   /** Budgets can be planned ahead; reports have nothing to show there. */
   allowFuture?: boolean;
+  /** Carried through the links so changing month keeps the currency. */
+  currency?: string;
 }) {
+  const suffix = currency ? `&c=${currency}` : "";
   const isCurrent = !allowFuture && monthStartIso >= currentMonthStartIso;
   const iconButton = buttonVariants({ variant: "outline", size: "icon" });
 
   return (
     <div className="flex items-center justify-between gap-2">
       <Link
-        href={`${basePath}?m=${monthKey(shiftMonth(monthStartIso, -1))}`}
+        href={`${basePath}?m=${monthKey(shiftMonth(monthStartIso, -1))}${suffix}`}
         aria-label="Previous month"
         className={iconButton}
       >
@@ -44,7 +48,7 @@ export function MonthNav({
         </span>
       ) : (
         <Link
-          href={`${basePath}?m=${monthKey(shiftMonth(monthStartIso, 1))}`}
+          href={`${basePath}?m=${monthKey(shiftMonth(monthStartIso, 1))}${suffix}`}
           aria-label="Next month"
           className={iconButton}
         >

@@ -24,6 +24,7 @@ import { Switch } from "@/components/ui/switch";
 import { fromMinor } from "@/lib/money";
 import type { Account, AccountType } from "@/lib/db/accounts";
 import { createAccountAction, updateAccountAction } from "@/app/accounts/actions";
+import { CURRENCIES, toCurrency, type Currency } from "@/lib/currency";
 
 const ACCOUNT_TYPE_LABELS: Record<AccountType, string> = {
   cash: "Cash",
@@ -40,6 +41,9 @@ export function AccountDialog({ account }: { account?: Account }) {
 
   const [open, setOpen] = useState(false);
   const [type, setType] = useState<AccountType>(account?.type ?? "cash");
+  const [currency, setCurrency] = useState<Currency>(
+    toCurrency(account?.currency),
+  );
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -62,6 +66,7 @@ export function AccountDialog({ account }: { account?: Account }) {
         setOpen(next);
         if (!next) {
           setType(account?.type ?? "cash");
+          setCurrency(toCurrency(account?.currency));
           setError(null);
         }
       }}
@@ -132,9 +137,39 @@ export function AccountDialog({ account }: { account?: Account }) {
             )}
           </div>
 
+          <div className="space-y-1.5">
+            <Label htmlFor="currency">Currency</Label>
+            {isEdit ? (
+              <p className="text-sm text-muted-foreground">
+                {currency}
+                <span className="block text-xs">
+                  Fixed once the account exists. To use another currency, add a new
+                  account.
+                </span>
+              </p>
+            ) : (
+              <Select
+                name="currency"
+                value={currency}
+                onValueChange={(value) => setCurrency(value as Currency)}
+              >
+                <SelectTrigger id="currency" className="w-full">
+                  <SelectValue>{(value: Currency) => value}</SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {CURRENCIES.map((c) => (
+                    <SelectItem key={c} value={c}>
+                      {c}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          </div>
+
           {!isEdit && (
             <div className="space-y-1.5">
-              <Label htmlFor="openingBalance">Opening balance (RSD)</Label>
+              <Label htmlFor="openingBalance">Opening balance ({currency})</Label>
               <Input
                 id="openingBalance"
                 name="openingBalance"
@@ -149,7 +184,7 @@ export function AccountDialog({ account }: { account?: Account }) {
           {type === "credit" && (
             <>
               <div className="space-y-1.5">
-                <Label htmlFor="creditLimit">Credit limit (RSD)</Label>
+                <Label htmlFor="creditLimit">Credit limit ({currency})</Label>
                 <Input
                   id="creditLimit"
                   name="creditLimit"

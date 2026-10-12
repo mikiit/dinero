@@ -7,6 +7,7 @@ import { format, parseISO } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Amount } from "@/components/ui/amount";
 import { resolveDueAction } from "@/app/recurring/actions";
+import { DEFAULT_CURRENCY } from "@/lib/currency";
 
 export type DueRow = {
   ruleId: string;
@@ -16,6 +17,8 @@ export type DueRow = {
   type: "expense" | "income" | "transfer";
   /** Minor units as a string (no bigint across the RSC boundary). */
   amount: string;
+  /** Currency of `amount` (the source account's). */
+  currency: string;
   accountName: string;
   /** Further occurrences waiting behind this one. */
   more: number;
@@ -52,9 +55,10 @@ function Row({ row }: { row: DueRow }) {
         </div>
         <Amount
           value={BigInt(row.amount)}
+          currency={row.currency}
           size="sm"
           tone={row.type === "income" ? "income" : row.type === "expense" ? "expense" : "transfer"}
-          showUnit={false}
+          showUnit={row.currency !== DEFAULT_CURRENCY}
         />
       </div>
       <div className="flex gap-2">

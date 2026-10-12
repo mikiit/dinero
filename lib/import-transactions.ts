@@ -15,9 +15,14 @@ export const TRANSACTION_CSV_HEADERS = [
   "category",
   "amount",
   "currency",
+  "to_amount",
   "merchant",
   "note",
 ] as const;
+
+/** Files exported before multi-currency have no to_amount column; they are
+ * still accepted (every row in them is single-currency). */
+const LEGACY_HEADERS = TRANSACTION_CSV_HEADERS.filter((h) => h !== "to_amount");
 
 export const MAX_IMPORT_ROWS = 5000;
 
@@ -38,6 +43,8 @@ export type PlannedTransaction = {
   categoryId: string | null;
   amount: bigint;
   currency: string;
+  /** Received amount of a transfer between currencies; else null. */
+  toAmount: bigint | null;
   occurredOn: string;
   merchant: string | null;
   note: string | null;
@@ -63,6 +70,7 @@ export function transactionKey(t: {
   toAccountId: string | null;
   categoryId: string | null;
   amount: bigint;
+  toAmount?: bigint | null;
   occurredOn: string;
   merchant: string | null;
   note: string | null;
@@ -74,6 +82,7 @@ export function transactionKey(t: {
     t.toAccountId ?? "",
     t.categoryId ?? "",
     t.amount.toString(),
+    t.toAmount?.toString() ?? "",
     t.merchant ?? "",
     t.note ?? "",
   ]);
@@ -116,11 +125,13 @@ export function planTransactionsImport(
 
   if (rows.length === 0) return fail("The file is empty.");
   const header = rows[0].map((h) => h.trim());
-  if (header.join(",") !== TRANSACTION_CSV_HEADERS.join(",")) {
+  const isLegacy = header.join(",") === LEGACY_HEADERS.join(",");
+  if (!isLegacy && header.join(",") !== TRANSACTION_CSV_HEADERS.join(",")) {
     return fail(
       `Unexpected columns. Expected: ${TRANSACTION_CSV_HEADERS.join(", ")}.`,
     );
   }
+  const columnCount = isLegacy ? LEGACY_HEADERS.length : TRANSACTION_CSV_HEADERS.length;
 
   const dataRows = rows.slice(1);
   if (dataRows.length > MAX_IMPORT_ROWS) {
@@ -156,13 +167,12 @@ export function planTransactionsImport(
     const line = index + 2;
     const error = (message: string) => plan.errors.push({ line, message });
 
-    if (cells.length !== TRANSACTION_CSV_HEADERS.length) {
-      return error(
-        `Expected ${TRANSACTION_CSV_HEADERS.length} columns, found ${cells.length}.`,
-      );
+    if (cells.length !== columnCount) {
+      return error(`Expected ${columnCount} columns, found ${cells.length}.`);
     }
-    const [date, type, accountRaw, toAccountRaw, categoryRaw, amountRaw, currency, merchantRaw, noteRaw] =
+    const [date, type, accountRaw, toAccountRaw, categoryRaw, amountRaw, currency, ...rest] =
       cells;
+    const [toAmountRaw, merchantRaw, noteRaw] = isLegacy ? ["", ...rest] : rest;
     // Text cells went through csvCell's formula guard on export.
     const accountName = unguardCell(accountRaw);
     const toAccountName = unguardCell(toAccountRaw);
@@ -239,6 +249,22 @@ export function planTransactionsImport(
       );
     }
 
+    // A transfer between currencies carries what arrived; nothing else may.
+    let toAmount: bigint | null = null;
+    const crossCurrency =
+      txType === "transfer" && toAccount !== null && toAccount.currency !== account.currency;
+    const toAmountText = toAmountRaw.trim();
+    if (crossCurrency) {
+      if (!/^\d+(\.\d{1,2})?$/.test(toAmountText) || toMinor(toAmountText) <= 0n) {
+        return error(
+          `Transfer from ${account.currency} to ${toAccount!.currency} needs a positive to_amount (the amount received).`,
+        );
+      }
+      toAmount = toMinor(toAmountText);
+    } else if (toAmountText !== "") {
+      return error("to_amount is only allowed on transfers between different currencies.");
+    }
+
     const planned: PlannedTransaction = {
       type: txType as ImportType,
       accountId: account.id,
@@ -246,6 +272,7 @@ export function planTransactionsImport(
       categoryId,
       amount,
       currency: account.currency,
+      toAmount,
       occurredOn,
       merchant: merchantRaw === "" ? null : unguardCell(merchantRaw),
       note: noteRaw === "" ? null : unguardCell(noteRaw),

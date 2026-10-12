@@ -1,4 +1,4 @@
-import { formatRSDParts } from "@/lib/money";
+import { formatMoneyParts } from "@/lib/money";
 import { cn } from "@/lib/utils";
 
 type AmountSize = "hero" | "lg" | "md" | "sm";
@@ -35,13 +35,14 @@ const TONE: Record<AmountTone, string> = {
 
 /**
  * The single place every money value in the app renders through. Splits
- * the number from the "RSD" unit (via formatRSDParts) so the unit can stay
+ * the number from the currency unit (via formatMoneyParts) so the unit can stay
  * small and de-emphasized instead of inheriting the number's size - that
  * alone is what keeps a 200.000+ RSD balance from overflowing a narrow
  * card, without ever truncating a figure.
  */
 export function Amount({
   value,
+  currency = "RSD",
   size = "md",
   tone = "neutral",
   showSign = false,
@@ -49,6 +50,8 @@ export function Amount({
   className,
 }: {
   value: bigint;
+  /** ISO code the value is in; RSD unless the account says otherwise. */
+  currency?: string;
   size?: AmountSize;
   tone?: AmountTone;
   /** Prefix a "+" for positive values. The locale formatter already
@@ -61,7 +64,7 @@ export function Amount({
   showUnit?: boolean;
   className?: string;
 }) {
-  const { number, unit } = formatRSDParts(value);
+  const { number, unit } = formatMoneyParts(value, currency);
   const sign = showSign && value > 0n ? "+" : "";
 
   return (

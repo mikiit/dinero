@@ -8,6 +8,8 @@ import type { Account } from "@/lib/db/accounts";
 import type { Category } from "@/lib/db/categories";
 import type { Transaction } from "@/lib/db/transactions";
 import { NoTransactionsYet } from "@/components/home/no-transactions-yet";
+import { DEFAULT_CURRENCY } from "@/lib/currency";
+import { transferReceivedLabel } from "@/components/transactions/transaction-type-icon";
 
 export function RecentTransactionsList({
   transactions,
@@ -54,6 +56,7 @@ export function RecentTransactionsList({
                 </span>
                 <span className="block truncate text-xs text-muted-foreground">
                   {transferAccountLabel(account?.name, t.type, t.toAccountId, accountById)}
+                  {transferReceivedLabel(t.type, t.toAmount, t.toAccountId, accountById)}
                 </span>
               </span>
             </div>
@@ -61,10 +64,11 @@ export function RecentTransactionsList({
               <TransactionTypeIcon type={t.type} />
               <Amount
                 value={signedAmount}
+                currency={t.currency}
                 size="md"
                 tone={transactionAmountTone(t.type)}
                 showSign={isIncome || t.type === "adjustment"}
-                showUnit={false}
+                showUnit={t.currency !== DEFAULT_CURRENCY}
               />
             </span>
           </li>

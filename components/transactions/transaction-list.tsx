@@ -16,6 +16,7 @@ import {
   TransactionTypeIcon,
   transactionAmountTone,
   transferAccountLabel,
+  transferReceivedLabel,
 } from "@/components/transactions/transaction-type-icon";
 import { toDecimalString, toMinor } from "@/lib/money";
 import type { Account } from "@/lib/db/accounts";
@@ -33,6 +34,7 @@ import { EditTransactionSheet } from "@/components/transactions/edit-transaction
 import { useToast } from "@/components/ui/toaster";
 import { useLedger } from "@/components/spaces/ledger-provider";
 import type { TransactionFormState } from "@/components/transactions/transaction-form-fields";
+import { DEFAULT_CURRENCY, sumByCurrency } from "@/lib/currency";
 
 type RowIssue = { message: string; retry: () => void };
 
@@ -122,18 +124,18 @@ function groupByDay(transactions: TransactionListItem[]) {
   return groups;
 }
 
-/** Net day total (income - expense). Transfers move money between the
- * user's own accounts and adjustments carry an arbitrary sign, so neither
- * has an unambiguous "expense-like or income-like" contribution to a
- * single day figure - they're excluded from the sum and just rendered
+/** Net day total (income - expense), one figure per currency - amounts in
+ * different currencies are never added together. Transfers move money
+ * between the user's own accounts and adjustments carry an arbitrary sign,
+ * so neither has an unambiguous "expense-like or income-like" contribution
+ * to a single day figure - they're excluded from the sum and just rendered
  * individually. */
-function dayTotal(transactions: TransactionListItem[]): bigint {
-  return transactions.reduce((sum, t) => {
-    const amount = BigInt(t.amount);
-    if (t.type === "income") return sum + amount;
-    if (t.type === "expense") return sum - amount;
-    return sum;
-  }, 0n);
+function dayTotals(transactions: TransactionListItem[]) {
+  return sumByCurrency(
+    transactions.filter((t) => t.type === "income" || t.type === "expense"),
+    (t) => t.currency,
+    (t) => (t.type === "income" ? BigInt(t.amount) : -BigInt(t.amount)),
+  );
 }
 
 export function TransactionList({
@@ -403,17 +405,23 @@ function TransactionListResults({
 
       <div className="space-y-6 lg:hidden">
         {dayGroups.map((group) => {
-          const total = dayTotal(group.transactions);
+          const totals = dayTotals(group.transactions);
           return (
           <div key={group.date}>
             <div className="mb-2 flex items-baseline justify-between">
               <h2 className="text-sm font-medium">{dayLabel(group.date)}</h2>
-              <Amount
-                value={total}
-                size="sm"
-                tone={total < 0n ? "expense" : "income"}
-                showUnit={false}
-              />
+              <span className="flex items-baseline gap-3">
+                {totals.map(({ currency, total }) => (
+                  <Amount
+                    key={currency}
+                    value={total}
+                    currency={currency}
+                    size="sm"
+                    tone={total < 0n ? "expense" : "income"}
+                    showUnit={currency !== DEFAULT_CURRENCY || totals.length > 1}
+                  />
+                ))}
+              </span>
             </div>
             <ul className="divide-y rounded-lg border">
               {group.transactions.map((t) => {
@@ -464,6 +472,7 @@ function TransactionListResults({
                           </span>
                           <span className="block truncate text-xs text-muted-foreground">
                             {transferAccountLabel(account?.name, t.type, t.toAccountId, accountById)}
+                            {transferReceivedLabel(t.type, t.toAmount, t.toAccountId, accountById)}
                             {t.note ? ` · ${t.note}` : ""}
                           </span>
                         </span>
@@ -473,10 +482,11 @@ function TransactionListResults({
                           <TransactionTypeIcon type={t.type} />
                           <Amount
                             value={signedAmount}
+                            currency={t.currency}
                             size="md"
                             tone={transactionAmountTone(t.type)}
                             showSign={isIncome || t.type === "adjustment"}
-                            showUnit={false}
+                            showUnit={t.currency !== DEFAULT_CURRENCY}
                           />
                         </span>
                         {canWrite && (
@@ -599,6 +609,7 @@ function TransactionListResults({
                   </td>
                   <td className="py-2.5 whitespace-nowrap text-muted-foreground">
                     {transferAccountLabel(account?.name, t.type, t.toAccountId, accountById)}
+                    {transferReceivedLabel(t.type, t.toAmount, t.toAccountId, accountById)}
                   </td>
                   <td className="py-2.5">
                     <TransactionTypeIcon type={t.type} />
@@ -606,10 +617,11 @@ function TransactionListResults({
                   <td className="py-2.5 text-right">
                     <Amount
                       value={signedAmount}
+                            currency={t.currency}
                       size="sm"
                       tone={transactionAmountTone(t.type)}
                       showSign={isIncome || t.type === "adjustment"}
-                      showUnit={false}
+                      showUnit={t.currency !== DEFAULT_CURRENCY}
                     />
                   </td>
                   <td className="py-2.5 text-right">

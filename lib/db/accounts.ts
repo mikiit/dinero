@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/database.types";
+import { DEFAULT_CURRENCY, type Currency } from "@/lib/currency";
 import { fromDbAmount, toDbAmount } from "@/lib/money";
 import { scopeColumns, scopeFilter, type Scope } from "@/lib/scope";
 
@@ -26,6 +27,8 @@ export type Account = {
 export type CreateAccountInput = {
   name: string;
   type: AccountType;
+  /** Fixed for the life of the account. Defaults to RSD. */
+  currency?: Currency;
   openingBalance: bigint;
   creditLimit?: bigint | null;
   statementDay?: number | null;
@@ -135,6 +138,7 @@ export async function createAccount(
     ...scopeColumns(scope),
     name: input.name,
     type: input.type,
+    currency: input.currency ?? DEFAULT_CURRENCY,
     opening_balance: toDbAmount(input.openingBalance),
     credit_limit:
       input.creditLimit == null ? null : toDbAmount(input.creditLimit),

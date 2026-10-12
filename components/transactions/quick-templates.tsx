@@ -2,7 +2,7 @@
 
 import { format } from "date-fns";
 import { RotateCcwIcon } from "lucide-react";
-import { formatRSDParts, toDecimalString } from "@/lib/money";
+import { formatMoneyParts, toDecimalString } from "@/lib/money";
 import type { QuickTemplate } from "@/lib/quick-templates";
 import type { Account } from "@/lib/db/accounts";
 import type { Category } from "@/lib/db/categories";
@@ -62,7 +62,9 @@ export function QuickTemplates({
             t.note?.trim() ||
             (t.categoryId ? categoryName.get(t.categoryId) : undefined) ||
             (t.type === "income" ? "Income" : "Expense");
-          const amount = formatRSDParts(BigInt(t.amount)).number;
+          const currency = accounts.find((a) => a.id === t.accountId)?.currency ?? "RSD";
+          const { number, unit } = formatMoneyParts(BigInt(t.amount), currency);
+          const amount = currency === "RSD" ? number : `${number} ${unit}`;
           return (
             <button
               key={`${t.kind}-${t.type}-${t.accountId}-${t.categoryId}-${t.amount}-${t.note}`}

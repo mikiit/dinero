@@ -33,7 +33,7 @@ export function AccountStrip({ accounts }: { accounts: Account[] }) {
               <>
                 <p className="mt-1 text-xs text-muted-foreground">Owed</p>
                 <Amount
-                  value={owed}
+                  value={owed} currency={account.currency}
                   size="lg"
                   tone={owed > 0n ? "expense" : "neutral"}
                   className="mt-0.5"
@@ -50,13 +50,13 @@ export function AccountStrip({ accounts }: { accounts: Account[] }) {
                     </div>
                     <p className="text-xs text-muted-foreground">
                       Limit{" "}
-                      <Amount value={account.creditLimit} size="sm" tone="muted" />
+                      <Amount value={account.creditLimit} currency={account.currency} size="sm" tone="muted" />
                     </p>
                   </div>
                 )}
               </>
             ) : (
-              <Amount value={account.balance} size="lg" className="mt-1" />
+              <Amount value={account.balance} currency={account.currency} size="lg" className="mt-1" />
             )}
           </Link>
         );

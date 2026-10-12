@@ -37,6 +37,7 @@ import {
   setRulePausedAction,
 } from "@/app/recurring/actions";
 import { cn } from "@/lib/utils";
+import { DEFAULT_CURRENCY } from "@/lib/currency";
 
 export type RuleItem = {
   id: string;
@@ -44,6 +45,7 @@ export type RuleItem = {
   type: "expense" | "income" | "transfer";
   /** Minor units, as a string (no bigint across the RSC boundary). */
   amount: string;
+  currency: string;
   accountName: string;
   toAccountName: string | null;
   scheduleText: string;
@@ -137,6 +139,7 @@ function RuleForm({
         accounts={accounts}
         categories={categories}
         dateLabel={ruleId ? "Next date" : "First date"}
+        sameCurrencyTransfersOnly
       >
         <div className="space-y-1.5">
           <Label htmlFor="interval">Repeat every</Label>
@@ -283,9 +286,10 @@ function RuleRow({
         </div>
         <Amount
           value={BigInt(rule.amount)}
+          currency={rule.currency}
           size="sm"
           tone={rule.type === "income" ? "income" : rule.type === "expense" ? "expense" : "transfer"}
-          showUnit={false}
+          showUnit={rule.currency !== DEFAULT_CURRENCY}
         />
       </div>
 

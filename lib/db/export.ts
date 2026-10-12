@@ -87,6 +87,11 @@ export async function buildTransactionsCsv(
       text: false,
     },
     { header: "currency", value: (r) => r.currency, text: false },
+    {
+      header: "to_amount",
+      value: (r) => (r.to_amount === null ? "" : toDecimalString(fromDbAmount(r.to_amount))),
+      text: false,
+    },
     { header: "merchant", value: (r) => r.merchant ?? "" },
     { header: "note", value: (r) => r.note ?? "" },
   ]);

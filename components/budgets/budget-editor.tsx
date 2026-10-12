@@ -23,10 +23,12 @@ export type BudgetRowData = {
 function BudgetRow({
   row,
   monthStartIso,
+  currency,
   readOnly,
 }: {
   row: BudgetRowData;
   monthStartIso: string;
+  currency: string;
   readOnly: boolean;
 }) {
   const saved = row.budget === null ? "" : toDecimalString(row.budget);
@@ -46,7 +48,7 @@ function BudgetRow({
     e.preventDefault();
     setMessage(null);
     startTransition(async () => {
-      const result = await setBudgetAction(row.categoryId, monthStartIso, value);
+      const result = await setBudgetAction(row.categoryId, monthStartIso, currency, value);
       if (result.error) {
         setMessage({ text: result.error, isError: true });
         return;
@@ -62,7 +64,7 @@ function BudgetRow({
         <span className="min-w-0 truncate text-sm font-medium">{row.name}</span>
         <span className="flex shrink-0 items-baseline gap-1.5 text-xs text-muted-foreground">
           spent
-          <Amount value={row.spent} size="sm" tone="muted" showUnit={false} />
+          <Amount value={row.spent} currency={currency} size="sm" tone="muted" showUnit={false} />
         </span>
       </div>
       <form onSubmit={save} className="flex items-center gap-2">
@@ -101,10 +103,12 @@ function BudgetRow({
 export function BudgetEditor({
   rows,
   monthStartIso,
+  currency,
   readOnly = false,
 }: {
   rows: BudgetRowData[];
   monthStartIso: string;
+  currency: string;
   readOnly?: boolean;
 }) {
   const router = useRouter();
@@ -114,7 +118,7 @@ export function BudgetEditor({
   function copyPrevious() {
     setCopyMessage(null);
     startTransition(async () => {
-      const result = await copyBudgetsAction(monthStartIso);
+      const result = await copyBudgetsAction(monthStartIso, currency);
       if (result.error) {
         setCopyMessage(result.error);
         return;
@@ -160,9 +164,10 @@ export function BudgetEditor({
             // Keyed by month and saved value: moving month or a refresh after
             // save remounts the row so the input always reflects the DB.
             <BudgetRow
-              key={`${monthStartIso}-${row.categoryId}-${String(row.budget)}`}
+              key={`${monthStartIso}-${currency}-${row.categoryId}-${String(row.budget)}`}
               row={row}
               monthStartIso={monthStartIso}
+              currency={currency}
               readOnly={readOnly}
             />
           ))}

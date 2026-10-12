@@ -8,7 +8,10 @@ import {
   type ImportCategory,
 } from "./import-transactions";
 
-const HEADER = TRANSACTION_CSV_HEADERS.join(",");
+// The pre-multi-currency header (no to_amount): still accepted, and keeps
+// these single-currency fixtures short. The full header is used below.
+const HEADER = TRANSACTION_CSV_HEADERS.filter((h) => h !== "to_amount").join(",");
+const FULL_HEADER = TRANSACTION_CSV_HEADERS.join(",");
 
 const accounts: ImportAccount[] = [
   { id: "a-wallet", name: "Wallet", currency: "RSD" },
@@ -46,6 +49,7 @@ describe("planTransactionsImport", () => {
         categoryId: "c-groc",
         amount: 12345n,
         currency: "RSD",
+        toAmount: null,
         occurredOn: "2026-01-15",
         merchant: "Maxi",
         note: "milk",
@@ -153,6 +157,49 @@ describe("planTransactionsImport", () => {
     const p = plan([row, row, row], new Map([[key, 1]]));
     expect(p.duplicates).toBe(1);
     expect(p.toInsert).toHaveLength(2);
+  });
+
+  describe("transfers between currencies", () => {
+    function planFull(lines: string[]) {
+      return planTransactionsImport(
+        [FULL_HEADER, ...lines].join("\r\n"),
+        accounts,
+        categories,
+        new Map(),
+      );
+    }
+
+    it("takes the received amount from to_amount", () => {
+      const p = planFull(["2026-01-15,transfer,Euro,Wallet,,100.00,EUR,11700.50,,"]);
+      expect(p.errors).toEqual([]);
+      expect(p.toInsert[0]).toMatchObject({
+        type: "transfer",
+        amount: 10000n,
+        currency: "EUR",
+        toAmount: 1170050n,
+      });
+    });
+
+    it("requires to_amount when the currencies differ", () => {
+      const p = planFull(["2026-01-15,transfer,Euro,Wallet,,100.00,EUR,,,"]);
+      expect(p.toInsert).toEqual([]);
+      expect(p.errors[0].message).toMatch(/needs a positive to_amount/);
+    });
+
+    it("rejects to_amount on same-currency transfers and on other types", () => {
+      const p = planFull([
+        "2026-01-15,transfer,Wallet,Card,,50.00,RSD,50.00,,",
+        "2026-01-15,expense,Wallet,,,5.00,RSD,5.00,,",
+      ]);
+      expect(p.toInsert).toEqual([]);
+      expect(p.errors.map((e) => e.line)).toEqual([2, 3]);
+    });
+
+    it("treats an old 9-column file as single-currency", () => {
+      const p = plan(["2026-01-15,transfer,Euro,Wallet,,100.00,EUR,,"]);
+      expect(p.toInsert).toEqual([]);
+      expect(p.errors[0].message).toMatch(/needs a positive to_amount/);
+    });
   });
 
   it("handles quoted fields with commas and newlines", () => {

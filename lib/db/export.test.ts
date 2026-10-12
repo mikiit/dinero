@@ -106,7 +106,7 @@ describe.skipIf(!hasCredentials)("transactions CSV export (live)", () => {
     const lines = csv.replace("﻿", "").trimEnd().split("\r\n");
 
     expect(lines[0]).toBe(
-      "date,type,account,to_account,category,amount,currency,merchant,note",
+      "date,type,account,to_account,category,amount,currency,to_amount,merchant,note",
     );
     // header + 1001 bulk + formula row + archived-account row; not the deleted one
     expect(lines).toHaveLength(1 + BULK + 2);
@@ -117,8 +117,8 @@ describe.skipIf(!hasCredentials)("transactions CSV export (live)", () => {
     const csv = await buildTransactionsCsv(client, personalScope(userId));
 
     expect(csv).toContain(
-      '2026-01-15,expense,Wallet,,Food > Groceries,123.45,RSD,"Maxi, Beograd","\'=HYPERLINK(""x"")"',
+      '2026-01-15,expense,Wallet,,Food > Groceries,123.45,RSD,,"Maxi, Beograd","\'=HYPERLINK(""x"")"',
     );
-    expect(csv).toContain("2026-01-15,expense,Old card,,,123.45,RSD,,on archived");
+    expect(csv).toContain("2026-01-15,expense,Old card,,,123.45,RSD,,,on archived");
   }, 60000);
 });

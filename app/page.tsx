@@ -48,6 +48,7 @@ export default async function HomePage() {
         (t.type === "transfer" ? "Transfer" : "Recurring"),
       type: t.type,
       amount: t.amount,
+      currency: accounts.find((a) => a.id === t.accountId)?.currency ?? "RSD",
       accountName: accounts.find((a) => a.id === t.accountId)?.name ?? "Unknown account",
       more,
     };

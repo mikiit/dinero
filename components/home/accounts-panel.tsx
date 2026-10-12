@@ -34,12 +34,12 @@ export function AccountsPanel({ accounts }: { accounts: Account[] }) {
                 <p className="truncate text-sm font-medium">{account.name}</p>
                 {isCredit ? (
                   <Amount
-                    value={owed}
+                    value={owed} currency={account.currency}
                     size="sm"
                     tone={owed > 0n ? "expense" : "neutral"}
                   />
                 ) : (
-                  <Amount value={account.balance} size="sm" />
+                  <Amount value={account.balance} currency={account.currency} size="sm" />
                 )}
               </div>
               {isCredit && account.creditLimit != null && account.creditLimit > 0n && (

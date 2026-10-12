@@ -122,12 +122,19 @@ async function assertTemplateOwnership(
   const ids = [t.accountId, ...(t.toAccountId ? [t.toAccountId] : [])];
   const { data, error } = await supabase
     .from("accounts")
-    .select("id")
+    .select("id, currency")
     .filter(...scopeFilter(scope))
     .in("id", ids);
   if (error) throw error;
   if ((data ?? []).length !== new Set(ids).size) {
     throw new Error("Account not found.");
+  }
+  // The amount that arrives would change with the rate on the day, so a
+  // schedule cannot know it. Such a transfer is entered by hand each time.
+  if (t.type === "transfer" && new Set((data ?? []).map((a) => a.currency)).size > 1) {
+    throw new Error(
+      "A recurring transfer needs both accounts in the same currency. Add cross-currency transfers by hand.",
+    );
   }
   if (t.categoryId) {
     const { data: cat, error: catError } = await supabase
