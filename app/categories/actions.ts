@@ -1,7 +1,6 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createClient } from "@/lib/supabase/server";
 import {
   archiveCategory,
   createCategory,
@@ -9,6 +8,7 @@ import {
   updateCategory,
   type CategoryKind,
 } from "@/lib/db/categories";
+import { requireWriteContext } from "@/lib/context";
 
 export type CategoryFormState =
   | { status: "idle" }
@@ -49,15 +49,13 @@ export async function createCategoryAction(
   formData: FormData,
 ): Promise<CategoryFormState> {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) {
-      return { status: "error", error: "Not signed in." };
+    const gate = await requireWriteContext();
+    if (!gate.ctx) {
+      return { status: "error", error: gate.error };
     }
+    const { supabase, scope } = gate.ctx;
 
-    await createCategory(supabase, user.id, {
+    await createCategory(supabase, scope, {
       name: parseRequiredName(formData.get("name")),
       kind: parseKind(formData.get("kind")),
       parentId: parseOptionalParentId(formData.get("parentId")),
@@ -80,20 +78,18 @@ export async function updateCategoryAction(
   formData: FormData,
 ): Promise<CategoryFormState> {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) {
-      return { status: "error", error: "Not signed in." };
+    const gate = await requireWriteContext();
+    if (!gate.ctx) {
+      return { status: "error", error: gate.error };
     }
+    const { supabase, scope } = gate.ctx;
 
     const categoryId = formData.get("categoryId");
     if (typeof categoryId !== "string" || categoryId === "") {
       throw new Error("Missing category id.");
     }
 
-    await updateCategory(supabase, user.id, categoryId, {
+    await updateCategory(supabase, scope, categoryId, {
       name: parseRequiredName(formData.get("name")),
       kind: parseKind(formData.get("kind")),
       parentId: parseOptionalParentId(formData.get("parentId")),
@@ -112,31 +108,27 @@ export async function updateCategoryAction(
 }
 
 export async function archiveCategoryAction(formData: FormData): Promise<void> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return;
+  const gate = await requireWriteContext();
+  if (!gate.ctx) return;
+  const { supabase, scope } = gate.ctx;
 
   const categoryId = formData.get("categoryId");
   if (typeof categoryId !== "string" || categoryId === "") return;
 
-  await archiveCategory(supabase, user.id, categoryId);
+  await archiveCategory(supabase, scope, categoryId);
   revalidatePath("/categories");
 }
 
 export async function moveCategoryAction(formData: FormData): Promise<void> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return;
+  const gate = await requireWriteContext();
+  if (!gate.ctx) return;
+  const { supabase, scope } = gate.ctx;
 
   const categoryId = formData.get("categoryId");
   const direction = formData.get("direction");
   if (typeof categoryId !== "string" || categoryId === "") return;
   if (direction !== "up" && direction !== "down") return;
 
-  await moveCategory(supabase, user.id, categoryId, direction);
+  await moveCategory(supabase, scope, categoryId, direction);
   revalidatePath("/categories");
 }

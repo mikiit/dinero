@@ -1,19 +1,17 @@
-import { createClient } from "@/lib/supabase/server";
+import { getContext } from "@/lib/context";
 import { buildTransactionsCsv } from "@/lib/db/export";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const ctx = await getContext();
 
-  if (!user) {
+  if (!ctx) {
     return new Response("Not signed in", { status: 401 });
   }
 
-  const csv = await buildTransactionsCsv(supabase, user.id);
+  // The ledger currently selected: a space's export is that space's ledger.
+  const csv = await buildTransactionsCsv(ctx.supabase, ctx.scope);
   const stamp = new Date().toISOString().slice(0, 10);
 
   return new Response(csv, {

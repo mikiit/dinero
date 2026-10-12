@@ -8,6 +8,7 @@ import {
   type TransactionFilters,
 } from "./transactions";
 import { loadTestEnv, signInAnonymouslyWithRetry } from "./test-env";
+import { personalScope } from "@/lib/scope";
 
 // Live test of the Reports data layer. The property that matters most for a
 // finance report: the per-category breakdown must sum to the SAME number the
@@ -118,7 +119,7 @@ describe.skipIf(!hasCredentials)("reports data layer (live)", () => {
   const EXPECTED_MARCH = 175400n;
 
   it("breakdown rolls children into parents and counts only March expenses", async () => {
-    const r = await getSpendBreakdown(client, userId, MONTH);
+    const r = await getSpendBreakdown(client, personalScope(userId), MONTH);
     expect(r.total).toBe(EXPECTED_MARCH);
     expect(r.items.map((i) => [i.name, i.total])).toEqual([
       ["Food", 105100n], // 1001*100 (Groceries) + 5000 (Food)
@@ -128,8 +129,8 @@ describe.skipIf(!hasCredentials)("reports data layer (live)", () => {
   }, 60000);
 
   it("breakdown total equals the SQL monthly_summary expense for that month", async () => {
-    const breakdown = await getSpendBreakdown(client, userId, MONTH);
-    const series = await getMonthlySeries(client, userId, MONTH);
+    const breakdown = await getSpendBreakdown(client, personalScope(userId), MONTH);
+    const series = await getMonthlySeries(client, personalScope(userId), MONTH);
     const march = series[series.length - 1];
     expect(march.month).toBe(MONTH);
     expect(breakdown.total).toBe(march.expense);
@@ -137,7 +138,7 @@ describe.skipIf(!hasCredentials)("reports data layer (live)", () => {
   }, 60000);
 
   it("12-month series is contiguous and zero-filled", async () => {
-    const series = await getMonthlySeries(client, userId, "2026-06-01");
+    const series = await getMonthlySeries(client, personalScope(userId), "2026-06-01");
     expect(series).toHaveLength(12);
     expect(series[0].month).toBe("2025-07-01");
     const feb = series.find((m) => m.month === "2026-02-01")!;
@@ -151,7 +152,7 @@ describe.skipIf(!hasCredentials)("reports data layer (live)", () => {
     const out: Transaction[] = [];
     let cursor = null as Awaited<ReturnType<typeof listTransactionsPage>>["nextCursor"];
     do {
-      const page = await listTransactionsPage(client, userId, filters, cursor, 400);
+      const page = await listTransactionsPage(client, personalScope(userId), filters, cursor, 400);
       out.push(...page.transactions);
       cursor = page.nextCursor;
     } while (cursor);

@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createClient } from "@/lib/supabase/server";
+import { requireWriteContext } from "@/lib/context";
 import {
   clearBudget,
   copyPreviousMonthBudgets,
@@ -13,14 +13,6 @@ export type BudgetActionResult = { error?: string; added?: number };
 
 const MONTH_START = /^\d{4}-(0[1-9]|1[0-2])-01$/;
 
-async function currentUserId() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  return { supabase, userId: user?.id ?? null };
-}
-
 /** Empty amount clears the budget; anything else sets it. */
 export async function setBudgetAction(
   categoryId: string,
@@ -30,11 +22,12 @@ export async function setBudgetAction(
   if (!MONTH_START.test(monthStartIso)) return { error: "Invalid month." };
 
   try {
-    const { supabase, userId } = await currentUserId();
-    if (!userId) return { error: "Not signed in." };
+    const gate = await requireWriteContext();
+    if (!gate.ctx) return { error: gate.error };
+    const { supabase, scope } = gate.ctx;
 
     if (amountText.trim() === "") {
-      await clearBudget(supabase, userId, categoryId, monthStartIso);
+      await clearBudget(supabase, scope, categoryId, monthStartIso);
     } else {
       let amount: bigint;
       try {
@@ -42,7 +35,7 @@ export async function setBudgetAction(
       } catch {
         return { error: "Enter an amount like 15000 or 15000,50." };
       }
-      await setBudget(supabase, userId, categoryId, monthStartIso, amount);
+      await setBudget(supabase, scope, categoryId, monthStartIso, amount);
     }
   } catch (err) {
     return { error: err instanceof Error ? err.message : "Could not save." };
@@ -59,9 +52,10 @@ export async function copyBudgetsAction(
   if (!MONTH_START.test(monthStartIso)) return { error: "Invalid month." };
 
   try {
-    const { supabase, userId } = await currentUserId();
-    if (!userId) return { error: "Not signed in." };
-    const added = await copyPreviousMonthBudgets(supabase, userId, monthStartIso);
+    const gate = await requireWriteContext();
+    if (!gate.ctx) return { error: gate.error };
+    const { supabase, scope } = gate.ctx;
+    const added = await copyPreviousMonthBudgets(supabase, scope, monthStartIso);
     revalidatePath("/budgets");
     revalidatePath("/reports");
     return { added };

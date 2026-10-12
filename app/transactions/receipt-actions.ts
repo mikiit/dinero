@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createClient } from "@/lib/supabase/server";
+import { getContext, requireWriteContext } from "@/lib/context";
 import {
   attachReceipt,
   getReceiptSignedUrl,
@@ -10,19 +10,11 @@ import {
 
 export type ReceiptActionResult = { error?: string };
 
-async function session() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  return { supabase, userId: user?.id ?? null };
-}
-
 /** A short-lived link for displaying a receipt; null if it can't be shown. */
 export async function getReceiptUrlAction(path: string): Promise<string | null> {
-  const { supabase, userId } = await session();
-  if (!userId) return null;
-  return getReceiptSignedUrl(supabase, userId, path);
+  const ctx = await getContext();
+  if (!ctx) return null;
+  return getReceiptSignedUrl(ctx.supabase, ctx.scope, path);
 }
 
 export async function attachReceiptAction(
@@ -30,9 +22,9 @@ export async function attachReceiptAction(
   path: string,
 ): Promise<ReceiptActionResult> {
   try {
-    const { supabase, userId } = await session();
-    if (!userId) return { error: "Not signed in." };
-    await attachReceipt(supabase, userId, transactionId, path);
+    const gate = await requireWriteContext();
+    if (!gate.ctx) return { error: gate.error };
+    await attachReceipt(gate.ctx.supabase, gate.ctx.scope, transactionId, path);
   } catch (err) {
     return { error: err instanceof Error ? err.message : "Could not attach the photo." };
   }
@@ -44,9 +36,9 @@ export async function removeReceiptAction(
   transactionId: string,
 ): Promise<ReceiptActionResult> {
   try {
-    const { supabase, userId } = await session();
-    if (!userId) return { error: "Not signed in." };
-    await removeReceipt(supabase, userId, transactionId);
+    const gate = await requireWriteContext();
+    if (!gate.ctx) return { error: gate.error };
+    await removeReceipt(gate.ctx.supabase, gate.ctx.scope, transactionId);
   } catch (err) {
     return { error: err instanceof Error ? err.message : "Could not remove the photo." };
   }

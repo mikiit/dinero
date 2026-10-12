@@ -13,6 +13,7 @@ import {
   skipDueOccurrence,
 } from "./recurring";
 import { loadTestEnv, signInAnonymouslyWithRetry } from "./test-env";
+import { personalScope } from "@/lib/scope";
 
 // SPEC.md §7, Phase 3 acceptance check, made permanent: "A recurring rent
 // rule fires exactly once on its date, even if the app is opened five times
@@ -62,8 +63,8 @@ describe.skipIf(!hasCredentials)("recurring rules (live, SPEC.md P3)", () => {
   }
 
   async function newRule(over: Parameters<typeof base>[0] = {}) {
-    await createRule(client, userId, base(over));
-    const rules = await listRules(client, userId);
+    await createRule(client, personalScope(userId), base(over));
+    const rules = await listRules(client, personalScope(userId));
     // Newest by creation = the one not seen before; tests clean up by user.
     return rules.find((r) => !seen.has(r.id))!.id;
   }
@@ -123,10 +124,10 @@ describe.skipIf(!hasCredentials)("recurring rules (live, SPEC.md P3)", () => {
     const id = await createAndTrack();
 
     await Promise.all(
-      Array.from({ length: 5 }, () => processAutoRules(client, userId, TODAY)),
+      Array.from({ length: 5 }, () => processAutoRules(client, personalScope(userId), TODAY)),
     );
     // ...and three more times afterwards, one by one.
-    for (let i = 0; i < 3; i++) await processAutoRules(client, userId, TODAY);
+    for (let i = 0; i < 3; i++) await processAutoRules(client, personalScope(userId), TODAY);
 
     const posted = await postedFor(id);
     expect(posted).toHaveLength(1);
@@ -137,7 +138,7 @@ describe.skipIf(!hasCredentials)("recurring rules (live, SPEC.md P3)", () => {
       currency: "RSD",
     });
 
-    const rule = (await listRules(client, userId)).find((r) => r.id === id)!;
+    const rule = (await listRules(client, personalScope(userId))).find((r) => r.id === id)!;
     expect(rule.nextRunOn).toBe("2026-11-12");
   }, 90000);
 
@@ -145,7 +146,7 @@ describe.skipIf(!hasCredentials)("recurring rules (live, SPEC.md P3)", () => {
     const id = await createAndTrack({ startOn: "2026-07-12" });
 
     await Promise.all(
-      Array.from({ length: 5 }, () => processAutoRules(client, userId, TODAY)),
+      Array.from({ length: 5 }, () => processAutoRules(client, personalScope(userId), TODAY)),
     );
 
     expect((await postedFor(id)).map((t) => t.occurred_on)).toEqual([
@@ -158,7 +159,7 @@ describe.skipIf(!hasCredentials)("recurring rules (live, SPEC.md P3)", () => {
 
   it("recovers from a crash between insert and advance without doubling", async () => {
     const id = await createAndTrack({ startOn: "2026-10-12" });
-    await processAutoRules(client, userId, TODAY);
+    await processAutoRules(client, personalScope(userId), TODAY);
     expect(await postedFor(id)).toHaveLength(1);
 
     // Simulate dying after the insert but before the rule was advanced.
@@ -167,15 +168,15 @@ describe.skipIf(!hasCredentials)("recurring rules (live, SPEC.md P3)", () => {
       .update({ next_run_on: TODAY })
       .eq("id", id);
 
-    await processAutoRules(client, userId, TODAY);
+    await processAutoRules(client, personalScope(userId), TODAY);
     expect(await postedFor(id)).toHaveLength(1); // not 2
-    const rule = (await listRules(client, userId)).find((r) => r.id === id)!;
+    const rule = (await listRules(client, personalScope(userId))).find((r) => r.id === id)!;
     expect(rule.nextRunOn).toBe("2026-11-12"); // and it completed the advance
   }, 90000);
 
   it("a deleted auto-posted transaction is not re-created", async () => {
     const id = await createAndTrack({ startOn: "2026-10-12" });
-    await processAutoRules(client, userId, TODAY);
+    await processAutoRules(client, personalScope(userId), TODAY);
 
     await client
       .from("transactions")
@@ -183,7 +184,7 @@ describe.skipIf(!hasCredentials)("recurring rules (live, SPEC.md P3)", () => {
       .eq("recurring_id", id);
     await admin.from("recurring_rules").update({ next_run_on: TODAY }).eq("id", id);
 
-    await processAutoRules(client, userId, TODAY);
+    await processAutoRules(client, personalScope(userId), TODAY);
     const posted = await postedFor(id);
     expect(posted).toHaveLength(1);
     expect(posted[0].deleted_at).not.toBeNull();
@@ -195,7 +196,7 @@ describe.skipIf(!hasCredentials)("recurring rules (live, SPEC.md P3)", () => {
       startOn: "2026-07-12",
       endOn: "2026-08-31",
     });
-    await processAutoRules(client, userId, TODAY);
+    await processAutoRules(client, personalScope(userId), TODAY);
 
     expect(await postedFor(future)).toHaveLength(0);
     expect((await postedFor(ended)).map((t) => t.occurred_on)).toEqual([
@@ -208,49 +209,49 @@ describe.skipIf(!hasCredentials)("recurring rules (live, SPEC.md P3)", () => {
     const post = await createAndTrack({ autoPost: false, startOn: "2026-10-12" });
     const skip = await createAndTrack({ autoPost: false, startOn: "2026-10-12" });
 
-    await processAutoRules(client, userId, TODAY);
+    await processAutoRules(client, personalScope(userId), TODAY);
     expect(await postedFor(post)).toHaveLength(0);
 
-    const due = await listDue(client, userId, TODAY);
+    const due = await listDue(client, personalScope(userId), TODAY);
     expect(due.map((d) => d.rule.id).sort()).toEqual([post, skip].sort());
 
-    await postDueOccurrence(client, userId, post, TODAY, TODAY);
-    await skipDueOccurrence(client, userId, skip, TODAY, TODAY);
+    await postDueOccurrence(client, personalScope(userId), post, TODAY, TODAY);
+    await skipDueOccurrence(client, personalScope(userId), skip, TODAY, TODAY);
 
     expect(await postedFor(post)).toHaveLength(1);
     expect(await postedFor(skip)).toHaveLength(0); // skipped = no transaction
 
     // A stale second click on either is rejected, not double-applied.
-    await expect(postDueOccurrence(client, userId, post, TODAY, TODAY)).rejects.toThrow(/already handled/);
-    await expect(skipDueOccurrence(client, userId, skip, TODAY, TODAY)).rejects.toThrow(/already handled/);
+    await expect(postDueOccurrence(client, personalScope(userId), post, TODAY, TODAY)).rejects.toThrow(/already handled/);
+    await expect(skipDueOccurrence(client, personalScope(userId), skip, TODAY, TODAY)).rejects.toThrow(/already handled/);
     expect(await postedFor(post)).toHaveLength(1);
 
-    const stillDue = await listDue(client, userId, TODAY);
+    const stillDue = await listDue(client, personalScope(userId), TODAY);
     expect(stillDue.map((d) => d.rule.id)).not.toContain(post);
     expect(stillDue.map((d) => d.rule.id)).not.toContain(skip);
   }, 90000);
 
   it("handles prompt rules with several missed occurrences in order", async () => {
     const id = await createAndTrack({ autoPost: false, startOn: "2026-08-12" });
-    const [item] = (await listDue(client, userId, TODAY)).filter((d) => d.rule.id === id);
+    const [item] = (await listDue(client, personalScope(userId), TODAY)).filter((d) => d.rule.id === id);
     expect(item.date).toBe("2026-08-12");
     expect(item.more).toBe(2);
 
     // Only the oldest can be acted on.
-    await expect(postDueOccurrence(client, userId, id, "2026-09-12", TODAY)).rejects.toThrow(/already handled/);
-    await postDueOccurrence(client, userId, id, "2026-08-12", TODAY);
-    const [next] = (await listDue(client, userId, TODAY)).filter((d) => d.rule.id === id);
+    await expect(postDueOccurrence(client, personalScope(userId), id, "2026-09-12", TODAY)).rejects.toThrow(/already handled/);
+    await postDueOccurrence(client, personalScope(userId), id, "2026-08-12", TODAY);
+    const [next] = (await listDue(client, personalScope(userId), TODAY)).filter((d) => d.rule.id === id);
     expect(next.date).toBe("2026-09-12");
   }, 90000);
 
   it("paused rules do not post, and resuming does not back-fill the pause", async () => {
     const id = await createAndTrack({ startOn: "2026-07-12" });
-    await pauseRule(client, userId, id);
-    await processAutoRules(client, userId, TODAY);
+    await pauseRule(client, personalScope(userId), id);
+    await processAutoRules(client, personalScope(userId), TODAY);
     expect(await postedFor(id)).toHaveLength(0);
 
-    await resumeRule(client, userId, id, TODAY);
-    await processAutoRules(client, userId, TODAY);
+    await resumeRule(client, personalScope(userId), id, TODAY);
+    await processAutoRules(client, personalScope(userId), TODAY);
     // Resumed on Oct 12 itself: that day's occurrence posts, July-Sept do not.
     expect((await postedFor(id)).map((t) => t.occurred_on)).toEqual(["2026-10-12"]);
   }, 90000);
@@ -267,7 +268,7 @@ describe.skipIf(!hasCredentials)("recurring rules (live, SPEC.md P3)", () => {
         merchant: null,
       },
     });
-    await processAutoRules(client, userId, TODAY);
+    await processAutoRules(client, personalScope(userId), TODAY);
     const posted = await postedFor(id);
     expect(posted).toHaveLength(1);
     expect(posted[0].type).toBe("transfer");
@@ -275,7 +276,7 @@ describe.skipIf(!hasCredentials)("recurring rules (live, SPEC.md P3)", () => {
 
   it("rejects a template naming another user's account or the wrong category kind", async () => {
     await expect(
-      createRule(client, userId, base({ template: { ...base().template, accountId: "00000000-0000-4000-8000-000000000000" } })),
+      createRule(client, personalScope(userId), base({ template: { ...base().template, accountId: "00000000-0000-4000-8000-000000000000" } })),
     ).rejects.toThrow();
     const { data: income } = await client
       .from("categories")
@@ -283,7 +284,7 @@ describe.skipIf(!hasCredentials)("recurring rules (live, SPEC.md P3)", () => {
       .select()
       .single();
     await expect(
-      createRule(client, userId, base({ template: { ...base().template, categoryId: income!.id } })),
+      createRule(client, personalScope(userId), base({ template: { ...base().template, categoryId: income!.id } })),
     ).rejects.toThrow(/expense category/);
   }, 60000);
 
@@ -300,15 +301,15 @@ describe.skipIf(!hasCredentials)("recurring rules (live, SPEC.md P3)", () => {
       .select()
       .single();
     expect(bad.error).toBeNull();
-    await expect(processAutoRules(client, userId, TODAY)).resolves.toBeTypeOf("number");
-    expect((await listRules(client, userId)).some((r) => r.id === bad.data!.id)).toBe(false);
+    await expect(processAutoRules(client, personalScope(userId), TODAY)).resolves.toBeTypeOf("number");
+    expect((await listRules(client, personalScope(userId))).some((r) => r.id === bad.data!.id)).toBe(false);
   }, 60000);
 
   it("soft-deleted rules vanish from the list and stop posting", async () => {
     const id = await createAndTrack({ startOn: "2026-10-12" });
-    await deleteRule(client, userId, id);
-    await processAutoRules(client, userId, TODAY);
+    await deleteRule(client, personalScope(userId), id);
+    await processAutoRules(client, personalScope(userId), TODAY);
     expect(await postedFor(id)).toHaveLength(0);
-    expect((await listRules(client, userId)).some((r) => r.id === id)).toBe(false);
+    expect((await listRules(client, personalScope(userId))).some((r) => r.id === id)).toBe(false);
   }, 60000);
 });

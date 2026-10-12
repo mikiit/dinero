@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/database.types";
 import { seedDefaultCategories } from "./seed-categories";
+import { scopeColumns, scopeFilter, type Scope } from "@/lib/scope";
 
 export type CategoryKind = "expense" | "income";
 
@@ -52,23 +53,23 @@ function toCategory(
  */
 export async function listCategories(
   supabase: SupabaseClient<Database>,
-  userId: string,
+  scope: Scope,
 ): Promise<Category[]> {
   const { count, error: countError } = await supabase
     .from("categories")
     .select("id", { count: "exact", head: true })
-    .eq("user_id", userId);
+    .filter(...scopeFilter(scope));
 
   if (countError) throw countError;
 
   if (count === 0) {
-    await seedDefaultCategories(supabase, userId);
+    await seedDefaultCategories(supabase, scope);
   }
 
   const { data, error } = await supabase
     .from("categories")
     .select("*")
-    .eq("user_id", userId)
+    .filter(...scopeFilter(scope))
     .is("archived_at", null)
     .order("sort_order", { ascending: true });
 
@@ -79,11 +80,11 @@ export async function listCategories(
 
 export async function createCategory(
   supabase: SupabaseClient<Database>,
-  userId: string,
+  scope: Scope,
   input: CreateCategoryInput,
 ): Promise<void> {
   const { error } = await supabase.from("categories").insert({
-    user_id: userId,
+    ...scopeColumns(scope),
     name: input.name,
     kind: input.kind,
     parent_id: input.parentId ?? null,
@@ -96,7 +97,7 @@ export async function createCategory(
 
 export async function updateCategory(
   supabase: SupabaseClient<Database>,
-  userId: string,
+  scope: Scope,
   categoryId: string,
   input: UpdateCategoryInput,
 ): Promise<void> {
@@ -111,14 +112,14 @@ export async function updateCategory(
     .from("categories")
     .update(patch)
     .eq("id", categoryId)
-    .eq("user_id", userId);
+    .filter(...scopeFilter(scope));
 
   if (error) throw error;
 }
 
 export async function archiveCategory(
   supabase: SupabaseClient<Database>,
-  userId: string,
+  scope: Scope,
   categoryId: string,
 ): Promise<void> {
   const archivedAt = new Date().toISOString();
@@ -127,7 +128,7 @@ export async function archiveCategory(
     .from("categories")
     .update({ archived_at: archivedAt })
     .eq("id", categoryId)
-    .eq("user_id", userId);
+    .filter(...scopeFilter(scope));
 
   if (error) throw error;
 
@@ -139,7 +140,7 @@ export async function archiveCategory(
     .from("categories")
     .update({ archived_at: archivedAt })
     .eq("parent_id", categoryId)
-    .eq("user_id", userId)
+    .filter(...scopeFilter(scope))
     .is("archived_at", null);
 
   if (childrenError) throw childrenError;
@@ -152,7 +153,7 @@ export async function archiveCategory(
  */
 export async function moveCategory(
   supabase: SupabaseClient<Database>,
-  userId: string,
+  scope: Scope,
   categoryId: string,
   direction: "up" | "down",
 ): Promise<void> {
@@ -160,7 +161,7 @@ export async function moveCategory(
     .from("categories")
     .select("id, kind, parent_id, sort_order")
     .eq("id", categoryId)
-    .eq("user_id", userId)
+    .filter(...scopeFilter(scope))
     .single();
 
   if (targetError) throw targetError;
@@ -168,7 +169,7 @@ export async function moveCategory(
   let siblingsQuery = supabase
     .from("categories")
     .select("id, sort_order")
-    .eq("user_id", userId)
+    .filter(...scopeFilter(scope))
     .eq("kind", target.kind)
     .is("archived_at", null);
 
@@ -199,12 +200,12 @@ export async function moveCategory(
       .from("categories")
       .update({ sort_order: swapWith.sort_order })
       .eq("id", current.id)
-      .eq("user_id", userId),
+      .filter(...scopeFilter(scope)),
     supabase
       .from("categories")
       .update({ sort_order: current.sort_order })
       .eq("id", swapWith.id)
-      .eq("user_id", userId),
+      .filter(...scopeFilter(scope)),
   ]);
 
   if (firstUpdate.error) throw firstUpdate.error;

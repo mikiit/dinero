@@ -1,11 +1,11 @@
 import { format, startOfMonth } from "date-fns";
-import { createClient } from "@/lib/supabase/server";
 import { listCategories } from "@/lib/db/categories";
 import { listBudgets } from "@/lib/db/budgets";
 import { getSpendBreakdown } from "@/lib/db/reports";
 import { parseMonthParam } from "@/lib/reports";
 import { MonthNav } from "@/components/reports/month-nav";
 import { BudgetEditor, type BudgetRowData } from "@/components/budgets/budget-editor";
+import { getContext } from "@/lib/context";
 
 export default async function BudgetsPage({
   searchParams,
@@ -14,12 +14,9 @@ export default async function BudgetsPage({
 }) {
   const { m } = await searchParams;
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const ctx = await getContext();
 
-  if (!user) {
+  if (!ctx) {
     return (
       <main className="mx-auto max-w-md p-4">
         <p className="text-sm text-muted-foreground">
@@ -29,15 +26,17 @@ export default async function BudgetsPage({
     );
   }
 
+  const { supabase, scope } = ctx;
+
   // Unlike Reports, budgets can be planned for next month, so only the
   // current month is the default - future months are not clamped away.
   const currentMonth = format(startOfMonth(new Date()), "yyyy-MM-dd");
   const month = parseMonthParam(m) ?? currentMonth;
 
   const [categories, budgets, spend] = await Promise.all([
-    listCategories(supabase, user.id),
-    listBudgets(supabase, user.id, month),
-    getSpendBreakdown(supabase, user.id, month),
+    listCategories(supabase, scope),
+    listBudgets(supabase, scope, month),
+    getSpendBreakdown(supabase, scope, month),
   ]);
 
   const spentById = new Map(

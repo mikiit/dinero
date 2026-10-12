@@ -9,6 +9,7 @@ import {
   type ReportCategory,
   type SpendBreakdown,
 } from "@/lib/reports";
+import { scopeFilter, type Scope } from "@/lib/scope";
 
 const PAGE_SIZE = 1000;
 
@@ -16,14 +17,14 @@ const PAGE_SIZE = 1000;
  * monthly_summary SQL view, zero-filled for empty months. */
 export async function getMonthlySeries(
   supabase: SupabaseClient<Database>,
-  userId: string,
+  scope: Scope,
   endMonthIso: string,
 ): Promise<MonthTotals[]> {
   const startMonth = shiftMonth(endMonthIso, -11);
   const { data, error } = await supabase
     .from("monthly_summary")
     .select("month, income, expense")
-    .eq("user_id", userId)
+    .filter(...scopeFilter(scope))
     .gte("month", startMonth)
     .lte("month", endMonthIso);
   if (error) throw error;
@@ -53,7 +54,7 @@ export async function getMonthlySeries(
  */
 export async function getSpendBreakdown(
   supabase: SupabaseClient<Database>,
-  userId: string,
+  scope: Scope,
   monthStartIso: string,
 ): Promise<SpendBreakdown> {
   const nextMonth = shiftMonth(monthStartIso, 1);
@@ -62,8 +63,8 @@ export async function getSpendBreakdown(
     supabase
       .from("categories")
       .select("id, name, parent_id")
-      .eq("user_id", userId),
-    fetchMonthExpenses(supabase, userId, monthStartIso, nextMonth),
+      .filter(...scopeFilter(scope)),
+    fetchMonthExpenses(supabase, scope, monthStartIso, nextMonth),
   ]);
   if (categoriesRes.error) throw categoriesRes.error;
 
@@ -78,7 +79,7 @@ export async function getSpendBreakdown(
 
 async function fetchMonthExpenses(
   supabase: SupabaseClient<Database>,
-  userId: string,
+  scope: Scope,
   fromIso: string,
   toExclusiveIso: string,
 ): Promise<{ categoryId: string | null; amount: bigint }[]> {
@@ -87,7 +88,7 @@ async function fetchMonthExpenses(
     const { data, error } = await supabase
       .from("transactions")
       .select("id, category_id, amount")
-      .eq("user_id", userId)
+      .filter(...scopeFilter(scope))
       .eq("type", "expense")
       .is("deleted_at", null)
       .gte("occurred_on", fromIso)

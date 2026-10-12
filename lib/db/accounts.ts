@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/database.types";
 import { fromDbAmount, toDbAmount } from "@/lib/money";
+import { scopeColumns, scopeFilter, type Scope } from "@/lib/scope";
 
 export type AccountType = "cash" | "debit" | "credit" | "savings";
 
@@ -74,19 +75,19 @@ function toAccount(
  */
 export async function listAccounts(
   supabase: SupabaseClient<Database>,
-  userId: string,
+  scope: Scope,
 ): Promise<Account[]> {
   const [accountsResult, balancesResult] = await Promise.all([
     supabase
       .from("accounts")
       .select("*")
-      .eq("user_id", userId)
+      .filter(...scopeFilter(scope))
       .is("archived_at", null)
       .order("sort_order", { ascending: true }),
     supabase
       .from("account_balances")
       .select("account_id, balance")
-      .eq("user_id", userId),
+      .filter(...scopeFilter(scope)),
   ]);
 
   if (accountsResult.error) throw accountsResult.error;
@@ -109,13 +110,13 @@ export async function listAccounts(
  */
 export async function getAccountBalance(
   supabase: SupabaseClient<Database>,
-  userId: string,
+  scope: Scope,
   accountId: string,
 ): Promise<bigint> {
   const { data, error } = await supabase
     .from("account_balances")
     .select("balance")
-    .eq("user_id", userId)
+    .filter(...scopeFilter(scope))
     .eq("account_id", accountId)
     .maybeSingle();
 
@@ -125,11 +126,11 @@ export async function getAccountBalance(
 
 export async function createAccount(
   supabase: SupabaseClient<Database>,
-  userId: string,
+  scope: Scope,
   input: CreateAccountInput,
 ): Promise<void> {
   const { error } = await supabase.from("accounts").insert({
-    user_id: userId,
+    ...scopeColumns(scope),
     name: input.name,
     type: input.type,
     opening_balance: toDbAmount(input.openingBalance),
@@ -147,7 +148,7 @@ export async function createAccount(
 
 export async function updateAccount(
   supabase: SupabaseClient<Database>,
-  userId: string,
+  scope: Scope,
   accountId: string,
   input: UpdateAccountInput,
 ): Promise<void> {
@@ -169,21 +170,21 @@ export async function updateAccount(
     .from("accounts")
     .update(patch)
     .eq("id", accountId)
-    .eq("user_id", userId);
+    .filter(...scopeFilter(scope));
 
   if (error) throw error;
 }
 
 export async function archiveAccount(
   supabase: SupabaseClient<Database>,
-  userId: string,
+  scope: Scope,
   accountId: string,
 ): Promise<void> {
   const { error } = await supabase
     .from("accounts")
     .update({ archived_at: new Date().toISOString() })
     .eq("id", accountId)
-    .eq("user_id", userId);
+    .filter(...scopeFilter(scope));
 
   if (error) throw error;
 }

@@ -3,7 +3,7 @@ import { Space_Grotesk, JetBrains_Mono } from "next/font/google";
 import { Providers } from "@/components/providers";
 import { BottomTabBar } from "@/components/nav/bottom-tab-bar";
 import { Sidebar } from "@/components/nav/sidebar";
-import { createClient } from "@/lib/supabase/server";
+import { getContext } from "@/lib/context";
 import { listAccounts } from "@/lib/db/accounts";
 import { listCategories } from "@/lib/db/categories";
 import { ensureRecurringPosted } from "@/lib/recurring-sync";
@@ -53,19 +53,16 @@ export const viewport: Viewport = {
 };
 
 export default async function RootLayout({ children }: LayoutProps<"/">) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const ctx = await getContext();
 
   // Before the balance reads below, so a rule that came due is already in
   // the ledger when they are computed.
-  if (user) await ensureRecurringPosted(user.id);
+  if (ctx) await ensureRecurringPosted();
 
-  const [accounts, categories] = user
+  const [accounts, categories] = ctx
     ? await Promise.all([
-        listAccounts(supabase, user.id),
-        listCategories(supabase, user.id),
+        listAccounts(ctx.supabase, ctx.scope),
+        listCategories(ctx.supabase, ctx.scope),
       ])
     : [[], []];
 

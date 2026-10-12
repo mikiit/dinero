@@ -5,6 +5,7 @@ import { signOut } from "@/lib/auth/sign-out";
 import { revalidatePath } from "next/cache";
 import { insertPlannedTransactions, planImportForUser } from "@/lib/db/import";
 import type { ImportRowError } from "@/lib/import-transactions";
+import { requireWriteContext } from "@/lib/context";
 
 export type SignOutActionResult = { error?: string };
 
@@ -64,14 +65,12 @@ export async function importTransactionsAction(
     return { status: "error", error: "File is too large (limit 900 KB)." };
   }
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { status: "error", error: "Not signed in." };
+  const gate = await requireWriteContext();
+  if (!gate.ctx) return { status: "error", error: gate.error };
+  const { supabase, scope } = gate.ctx;
 
   try {
-    const plan = await planImportForUser(supabase, user.id, await file.text());
+    const plan = await planImportForUser(supabase, scope, await file.text());
 
     if (formData.get("mode") !== "import") {
       return {
@@ -83,7 +82,7 @@ export async function importTransactionsAction(
       };
     }
 
-    await insertPlannedTransactions(supabase, user.id, plan.toInsert);
+    await insertPlannedTransactions(supabase, scope, plan.toInsert);
     revalidatePath("/", "layout");
     return {
       status: "done",

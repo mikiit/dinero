@@ -3,6 +3,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { Database } from "@/lib/database.types";
 import { loadTestEnv, signInAnonymouslyWithRetry } from "./test-env";
 import { listTransactionsPage, type TransactionsCursor } from "./transactions";
+import { personalScope } from "@/lib/scope";
 
 // Integration test against the LIVE linked Supabase project for
 // listTransactionsPage's riskiest behavior: the Transactions list groups
@@ -90,7 +91,7 @@ describe.skipIf(!hasCredentials)("listTransactionsPage pagination (live)", () =>
     do {
       const page = await listTransactionsPage(
         client,
-        userId,
+        personalScope(userId),
         {},
         cursor,
         pageSize,
@@ -113,7 +114,7 @@ describe.skipIf(!hasCredentials)("listTransactionsPage pagination (live)", () =>
 
     // Re-fetch everything in one big page purely to get each row's
     // occurred_on for the day-contiguity check below.
-    const full = await listTransactionsPage(client, userId, {}, null, 100);
+    const full = await listTransactionsPage(client, personalScope(userId), {}, null, 100);
     const idToDate = new Map(full.transactions.map((t) => [t.id, t.occurredOn]));
 
     // Walk the ORDER pages were actually returned in and assert each date
@@ -122,7 +123,7 @@ describe.skipIf(!hasCredentials)("listTransactionsPage pagination (live)", () =>
     let cursor2: TransactionsCursor = null;
     const orderedDates: string[] = [];
     do {
-      const page = await listTransactionsPage(client, userId, {}, cursor2, pageSize);
+      const page = await listTransactionsPage(client, personalScope(userId), {}, cursor2, pageSize);
       orderedDates.push(...page.transactions.map((t) => idToDate.get(t.id)!));
       cursor2 = page.nextCursor;
     } while (cursor2 !== null);

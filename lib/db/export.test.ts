@@ -3,6 +3,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { Database } from "@/lib/database.types";
 import { buildTransactionsCsv } from "./export";
 import { loadTestEnv, signInAnonymouslyWithRetry } from "./test-env";
+import { personalScope } from "@/lib/scope";
 
 // Live-database test: the export must cover EVERY non-deleted transaction.
 // PostgREST silently truncates a plain select at 1000 rows, so this seeds
@@ -101,7 +102,7 @@ describe.skipIf(!hasCredentials)("transactions CSV export (live)", () => {
   }, 30000);
 
   it("exports all non-deleted rows past the 1000-row page boundary", async () => {
-    const csv = await buildTransactionsCsv(client, userId);
+    const csv = await buildTransactionsCsv(client, personalScope(userId));
     const lines = csv.replace("﻿", "").trimEnd().split("\r\n");
 
     expect(lines[0]).toBe(
@@ -113,7 +114,7 @@ describe.skipIf(!hasCredentials)("transactions CSV export (live)", () => {
   }, 60000);
 
   it("resolves names, hierarchy, archived accounts, and guards formulas", async () => {
-    const csv = await buildTransactionsCsv(client, userId);
+    const csv = await buildTransactionsCsv(client, personalScope(userId));
 
     expect(csv).toContain(
       '2026-01-15,expense,Wallet,,Food > Groceries,123.45,RSD,"Maxi, Beograd","\'=HYPERLINK(""x"")"',

@@ -1,15 +1,12 @@
-import { createClient } from "@/lib/supabase/server";
 import { listAccounts } from "@/lib/db/accounts";
 import { listCategories } from "@/lib/db/categories";
 import { AddTransactionPageClient } from "@/components/transactions/add-transaction-page-client";
+import { getContext } from "@/lib/context";
 
 export default async function NewTransactionPage() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const ctx = await getContext();
 
-  if (!user) {
+  if (!ctx) {
     return (
       <main className="mx-auto max-w-md p-4">
         <p className="text-sm text-muted-foreground">
@@ -19,9 +16,11 @@ export default async function NewTransactionPage() {
     );
   }
 
+  const { supabase, scope } = ctx;
+
   const [accounts, categories] = await Promise.all([
-    listAccounts(supabase, user.id),
-    listCategories(supabase, user.id),
+    listAccounts(supabase, scope),
+    listCategories(supabase, scope),
   ]);
 
   return (

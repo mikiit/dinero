@@ -1,15 +1,12 @@
-import { createClient } from "@/lib/supabase/server";
 import { listCategories } from "@/lib/db/categories";
 import { CategoryList } from "@/components/categories/category-list";
 import { CategoryDialog } from "@/components/categories/category-dialog";
+import { getContext } from "@/lib/context";
 
 export default async function CategoriesPage() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const ctx = await getContext();
 
-  if (!user) {
+  if (!ctx) {
     return (
       <main className="mx-auto max-w-md p-4">
         <p className="text-sm text-muted-foreground">
@@ -19,7 +16,9 @@ export default async function CategoriesPage() {
     );
   }
 
-  const categories = await listCategories(supabase, user.id);
+  const { supabase, scope } = ctx;
+
+  const categories = await listCategories(supabase, scope);
 
   return (
     <main className="mx-auto max-w-md space-y-4 p-4 lg:max-w-4xl lg:p-8">

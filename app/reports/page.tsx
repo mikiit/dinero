@@ -1,5 +1,4 @@
 import { endOfMonth, format, parseISO, startOfMonth } from "date-fns";
-import { createClient } from "@/lib/supabase/server";
 import { getMonthlySeries, getSpendBreakdown } from "@/lib/db/reports";
 import { listCategories } from "@/lib/db/categories";
 import { listBudgets } from "@/lib/db/budgets";
@@ -13,6 +12,7 @@ import {
   BudgetProgressList,
   type BudgetProgressRow,
 } from "@/components/reports/budget-progress";
+import { getContext } from "@/lib/context";
 
 export default async function ReportsPage({
   searchParams,
@@ -21,12 +21,9 @@ export default async function ReportsPage({
 }) {
   const { m } = await searchParams;
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const ctx = await getContext();
 
-  if (!user) {
+  if (!ctx) {
     return (
       <main className="mx-auto max-w-md p-4">
         <p className="text-sm text-muted-foreground">
@@ -36,16 +33,18 @@ export default async function ReportsPage({
     );
   }
 
+  const { supabase, scope } = ctx;
+
   const currentMonth = format(startOfMonth(new Date()), "yyyy-MM-dd");
   // Future months have no data; clamp rather than render an empty report.
   const requested = parseMonthParam(m);
   const month = requested && requested <= currentMonth ? requested : currentMonth;
 
   const [series, spend, categories, budgets] = await Promise.all([
-    getMonthlySeries(supabase, user.id, month),
-    getSpendBreakdown(supabase, user.id, month),
-    listCategories(supabase, user.id),
-    listBudgets(supabase, user.id, month),
+    getMonthlySeries(supabase, scope, month),
+    getSpendBreakdown(supabase, scope, month),
+    listCategories(supabase, scope),
+    listBudgets(supabase, scope, month),
   ]);
   const selected = series[series.length - 1];
 
@@ -61,7 +60,7 @@ export default async function ReportsPage({
     return `/transactions?${params.toString()}`;
   });
 
-  const ctx = {
+  const budgetCtx = {
     monthStartIso: month,
     todayIso: format(new Date(), "yyyy-MM-dd"),
   };
@@ -73,7 +72,7 @@ export default async function ReportsPage({
     .map((c) => ({
       key: c.id,
       name: c.name,
-      progress: budgetProgress(budgets.get(c.id)!, spentById.get(c.id) ?? 0n, ctx),
+      progress: budgetProgress(budgets.get(c.id)!, spentById.get(c.id) ?? 0n, budgetCtx),
     }));
   // The total only compares budgeted categories, so unbudgeted spending
   // (which has no limit to exceed) can't make it look overspent.
@@ -85,7 +84,7 @@ export default async function ReportsPage({
           progress: budgetProgress(
             budgetRows.reduce((s, r) => s + r.progress.budget, 0n),
             budgetRows.reduce((s, r) => s + r.progress.spent, 0n),
-            ctx,
+            budgetCtx,
           ),
         }
       : null;

@@ -12,6 +12,7 @@ import {
   type RuleTemplate,
   type Schedule,
 } from "@/lib/recurring";
+import { scopeColumns, scopeFilter, type Scope } from "@/lib/scope";
 
 export type RecurringRule = {
   id: string;
@@ -80,12 +81,12 @@ function templateToJson(t: RuleTemplate): Json {
 /** All of the user's rules (paused included), soonest first. */
 export async function listRules(
   supabase: SupabaseClient<Database>,
-  userId: string,
+  scope: Scope,
 ): Promise<RecurringRule[]> {
   const { data, error } = await supabase
     .from("recurring_rules")
     .select("*")
-    .eq("user_id", userId)
+    .filter(...scopeFilter(scope))
     .is("deleted_at", null)
     .order("next_run_on", { ascending: true });
   if (error) throw error;
@@ -97,14 +98,14 @@ export async function listRules(
 
 async function getRule(
   supabase: SupabaseClient<Database>,
-  userId: string,
+  scope: Scope,
   ruleId: string,
 ): Promise<RecurringRule> {
   const { data, error } = await supabase
     .from("recurring_rules")
     .select("*")
     .eq("id", ruleId)
-    .eq("user_id", userId)
+    .filter(...scopeFilter(scope))
     .is("deleted_at", null)
     .single();
   if (error) throw error;
@@ -115,14 +116,14 @@ async function getRule(
 
 async function assertTemplateOwnership(
   supabase: SupabaseClient<Database>,
-  userId: string,
+  scope: Scope,
   t: RuleTemplate,
 ): Promise<void> {
   const ids = [t.accountId, ...(t.toAccountId ? [t.toAccountId] : [])];
   const { data, error } = await supabase
     .from("accounts")
     .select("id")
-    .eq("user_id", userId)
+    .filter(...scopeFilter(scope))
     .in("id", ids);
   if (error) throw error;
   if ((data ?? []).length !== new Set(ids).size) {
@@ -133,7 +134,7 @@ async function assertTemplateOwnership(
       .from("categories")
       .select("kind")
       .eq("id", t.categoryId)
-      .eq("user_id", userId)
+      .filter(...scopeFilter(scope))
       .single();
     if (catError) throw catError;
     if (cat.kind !== t.type) {
@@ -144,12 +145,12 @@ async function assertTemplateOwnership(
 
 export async function createRule(
   supabase: SupabaseClient<Database>,
-  userId: string,
+  scope: Scope,
   input: RuleInput,
 ): Promise<void> {
-  await assertTemplateOwnership(supabase, userId, input.template);
+  await assertTemplateOwnership(supabase, scope, input.template);
   const { error } = await supabase.from("recurring_rules").insert({
-    user_id: userId,
+    ...scopeColumns(scope),
     template: templateToJson(input.template),
     frequency: input.frequency,
     interval: input.interval,
@@ -168,11 +169,11 @@ export async function createRule(
  */
 export async function updateRule(
   supabase: SupabaseClient<Database>,
-  userId: string,
+  scope: Scope,
   ruleId: string,
   input: RuleInput,
 ): Promise<void> {
-  await assertTemplateOwnership(supabase, userId, input.template);
+  await assertTemplateOwnership(supabase, scope, input.template);
   const { error } = await supabase
     .from("recurring_rules")
     .update({
@@ -185,21 +186,21 @@ export async function updateRule(
       auto_post: input.autoPost,
     })
     .eq("id", ruleId)
-    .eq("user_id", userId)
+    .filter(...scopeFilter(scope))
     .is("deleted_at", null);
   if (error) throw error;
 }
 
 export async function pauseRule(
   supabase: SupabaseClient<Database>,
-  userId: string,
+  scope: Scope,
   ruleId: string,
 ): Promise<void> {
   const { error } = await supabase
     .from("recurring_rules")
     .update({ paused_at: new Date().toISOString() })
     .eq("id", ruleId)
-    .eq("user_id", userId)
+    .filter(...scopeFilter(scope))
     .is("deleted_at", null);
   if (error) throw error;
 }
@@ -208,30 +209,30 @@ export async function pauseRule(
  * rule sat paused is deliberately NOT back-filled. */
 export async function resumeRule(
   supabase: SupabaseClient<Database>,
-  userId: string,
+  scope: Scope,
   ruleId: string,
   todayIso: string,
 ): Promise<void> {
-  const rule = await getRule(supabase, userId, ruleId);
+  const rule = await getRule(supabase, scope, ruleId);
   const nextRunOn = firstOccurrenceFrom(rule.nextRunOn, scheduleOf(rule), todayIso);
   const { error } = await supabase
     .from("recurring_rules")
     .update({ paused_at: null, next_run_on: nextRunOn })
     .eq("id", ruleId)
-    .eq("user_id", userId);
+    .filter(...scopeFilter(scope));
   if (error) throw error;
 }
 
 export async function deleteRule(
   supabase: SupabaseClient<Database>,
-  userId: string,
+  scope: Scope,
   ruleId: string,
 ): Promise<void> {
   const { error } = await supabase
     .from("recurring_rules")
     .update({ deleted_at: new Date().toISOString() })
     .eq("id", ruleId)
-    .eq("user_id", userId);
+    .filter(...scopeFilter(scope));
   if (error) throw error;
 }
 
@@ -244,7 +245,7 @@ const UNIQUE_VIOLATION = "23505";
  * the rule and the rest are harmless no-ops. */
 async function advance(
   supabase: SupabaseClient<Database>,
-  userId: string,
+  scope: Scope,
   rule: RecurringRule,
   date: string,
 ): Promise<void> {
@@ -252,7 +253,7 @@ async function advance(
     .from("recurring_rules")
     .update({ next_run_on: nextOccurrence(date, scheduleOf(rule)) })
     .eq("id", rule.id)
-    .eq("user_id", userId)
+    .filter(...scopeFilter(scope))
     .eq("next_run_on", date);
   if (error) throw error;
 }
@@ -268,14 +269,14 @@ async function advance(
  */
 async function postOccurrence(
   supabase: SupabaseClient<Database>,
-  userId: string,
+  scope: Scope,
   rule: RecurringRule,
   date: string,
   currency: string,
 ): Promise<void> {
   const t = rule.template;
   const { error } = await supabase.from("transactions").insert({
-    user_id: userId,
+    ...scopeColumns(scope),
     type: t.type,
     account_id: t.accountId,
     to_account_id: t.toAccountId,
@@ -288,19 +289,19 @@ async function postOccurrence(
     recurring_id: rule.id,
   });
   if (error && error.code !== UNIQUE_VIOLATION) throw error;
-  await advance(supabase, userId, rule, date);
+  await advance(supabase, scope, rule, date);
 }
 
 async function accountCurrency(
   supabase: SupabaseClient<Database>,
-  userId: string,
+  scope: Scope,
   accountId: string,
 ): Promise<string> {
   const { data, error } = await supabase
     .from("accounts")
     .select("currency")
     .eq("id", accountId)
-    .eq("user_id", userId)
+    .filter(...scopeFilter(scope))
     .single();
   if (error) throw error;
   return data.currency;
@@ -315,13 +316,13 @@ async function accountCurrency(
  */
 export async function processAutoRules(
   supabase: SupabaseClient<Database>,
-  userId: string,
+  scope: Scope,
   todayIso: string,
 ): Promise<number> {
   const { data, error } = await supabase
     .from("recurring_rules")
     .select("*")
-    .eq("user_id", userId)
+    .filter(...scopeFilter(scope))
     .eq("auto_post", true)
     .is("paused_at", null)
     .is("deleted_at", null)
@@ -342,9 +343,9 @@ export async function processAutoRules(
     attempted++;
 
     try {
-      const currency = await accountCurrency(supabase, userId, rule.template.accountId);
+      const currency = await accountCurrency(supabase, scope, rule.template.accountId);
       for (const date of dates) {
-        await postOccurrence(supabase, userId, rule, date, currency);
+        await postOccurrence(supabase, scope, rule, date, currency);
       }
     } catch (err) {
       console.error(`recurring rule ${rule.id} failed to post`, err);
@@ -365,13 +366,13 @@ export type DueItem = {
  * rule - its oldest occurrence - because they must be handled in order. */
 export async function listDue(
   supabase: SupabaseClient<Database>,
-  userId: string,
+  scope: Scope,
   todayIso: string,
 ): Promise<DueItem[]> {
   const { data, error } = await supabase
     .from("recurring_rules")
     .select("*")
-    .eq("user_id", userId)
+    .filter(...scopeFilter(scope))
     .eq("auto_post", false)
     .is("paused_at", null)
     .is("deleted_at", null)
@@ -393,12 +394,12 @@ export async function listDue(
  * against acting on a stale screen (already posted from another tab). */
 async function loadDueOccurrence(
   supabase: SupabaseClient<Database>,
-  userId: string,
+  scope: Scope,
   ruleId: string,
   date: string,
   todayIso: string,
 ): Promise<RecurringRule> {
-  const rule = await getRule(supabase, userId, ruleId);
+  const rule = await getRule(supabase, scope, ruleId);
   if (
     rule.paused ||
     rule.nextRunOn !== date ||
@@ -412,24 +413,24 @@ async function loadDueOccurrence(
 
 export async function postDueOccurrence(
   supabase: SupabaseClient<Database>,
-  userId: string,
+  scope: Scope,
   ruleId: string,
   date: string,
   todayIso: string,
 ): Promise<void> {
-  const rule = await loadDueOccurrence(supabase, userId, ruleId, date, todayIso);
-  const currency = await accountCurrency(supabase, userId, rule.template.accountId);
-  await postOccurrence(supabase, userId, rule, date, currency);
+  const rule = await loadDueOccurrence(supabase, scope, ruleId, date, todayIso);
+  const currency = await accountCurrency(supabase, scope, rule.template.accountId);
+  await postOccurrence(supabase, scope, rule, date, currency);
 }
 
 /** Skips an occurrence: moves on without writing a transaction. */
 export async function skipDueOccurrence(
   supabase: SupabaseClient<Database>,
-  userId: string,
+  scope: Scope,
   ruleId: string,
   date: string,
   todayIso: string,
 ): Promise<void> {
-  const rule = await loadDueOccurrence(supabase, userId, ruleId, date, todayIso);
-  await advance(supabase, userId, rule, date);
+  const rule = await loadDueOccurrence(supabase, scope, ruleId, date, todayIso);
+  await advance(supabase, scope, rule, date);
 }

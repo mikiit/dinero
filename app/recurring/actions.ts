@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createClient } from "@/lib/supabase/server";
+import { requireWriteContext } from "@/lib/context";
 import {
   createRule,
   deleteRule,
@@ -42,14 +42,6 @@ export type SaveRuleInput = {
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 
-async function session() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  return { supabase, userId: user?.id ?? null };
-}
-
 function message(err: unknown, fallback: string): string {
   return err instanceof Error ? err.message : fallback;
 }
@@ -88,8 +80,9 @@ export async function saveRuleAction(
   }
 
   try {
-    const { supabase, userId } = await session();
-    if (!userId) return { error: "Not signed in." };
+    const gate = await requireWriteContext();
+    if (!gate.ctx) return { error: gate.error };
+    const { supabase, scope } = gate.ctx;
 
     const rule = {
       template: {
@@ -108,8 +101,8 @@ export async function saveRuleAction(
       autoPost: input.autoPost,
     };
 
-    if (input.id) await updateRule(supabase, userId, input.id, rule);
-    else await createRule(supabase, userId, rule);
+    if (input.id) await updateRule(supabase, scope, input.id, rule);
+    else await createRule(supabase, scope, rule);
   } catch (err) {
     return { error: message(err, "Could not save the rule.") };
   }
@@ -123,10 +116,11 @@ export async function setRulePausedAction(
   paused: boolean,
 ): Promise<RecurringActionResult> {
   try {
-    const { supabase, userId } = await session();
-    if (!userId) return { error: "Not signed in." };
-    if (paused) await pauseRule(supabase, userId, ruleId);
-    else await resumeRule(supabase, userId, ruleId, todayInAppTimeZone());
+    const gate = await requireWriteContext();
+    if (!gate.ctx) return { error: gate.error };
+    const { supabase, scope } = gate.ctx;
+    if (paused) await pauseRule(supabase, scope, ruleId);
+    else await resumeRule(supabase, scope, ruleId, todayInAppTimeZone());
   } catch (err) {
     return { error: message(err, "Could not update the rule.") };
   }
@@ -138,9 +132,10 @@ export async function deleteRuleAction(
   ruleId: string,
 ): Promise<RecurringActionResult> {
   try {
-    const { supabase, userId } = await session();
-    if (!userId) return { error: "Not signed in." };
-    await deleteRule(supabase, userId, ruleId);
+    const gate = await requireWriteContext();
+    if (!gate.ctx) return { error: gate.error };
+    const { supabase, scope } = gate.ctx;
+    await deleteRule(supabase, scope, ruleId);
   } catch (err) {
     return { error: message(err, "Could not delete the rule.") };
   }
@@ -156,13 +151,14 @@ export async function resolveDueAction(
 ): Promise<RecurringActionResult> {
   if (!DATE.test(date)) return { error: "Invalid date." };
   try {
-    const { supabase, userId } = await session();
-    if (!userId) return { error: "Not signed in." };
+    const gate = await requireWriteContext();
+    if (!gate.ctx) return { error: gate.error };
+    const { supabase, scope } = gate.ctx;
     const today = todayInAppTimeZone();
     if (decision === "post") {
-      await postDueOccurrence(supabase, userId, ruleId, date, today);
+      await postDueOccurrence(supabase, scope, ruleId, date, today);
     } else {
-      await skipDueOccurrence(supabase, userId, ruleId, date, today);
+      await skipDueOccurrence(supabase, scope, ruleId, date, today);
     }
   } catch (err) {
     return { error: message(err, "Could not complete that.") };

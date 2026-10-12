@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/database.types";
 import { DEFAULT_CATEGORIES } from "./default-categories";
+import { scopeColumns, scopeFilter, type Scope } from "@/lib/scope";
 
 /**
  * Inserts the default category set (SPEC.md Phase 0) for a user, skipping
@@ -9,12 +10,12 @@ import { DEFAULT_CATEGORIES } from "./default-categories";
  */
 export async function seedDefaultCategories(
   supabase: SupabaseClient<Database>,
-  userId: string,
+  scope: Scope,
 ) {
   const { data: existing, error: fetchError } = await supabase
     .from("categories")
     .select("name, kind")
-    .eq("user_id", userId)
+    .filter(...scopeFilter(scope))
     .is("archived_at", null);
 
   if (fetchError) {
@@ -28,7 +29,7 @@ export async function seedDefaultCategories(
   const toInsert = DEFAULT_CATEGORIES.filter(
     (c) => !existingKeys.has(`${c.kind}:${c.name}`),
   ).map((c) => ({
-    user_id: userId,
+    ...scopeColumns(scope),
     name: c.name,
     kind: c.kind,
     sort_order: c.sortOrder,

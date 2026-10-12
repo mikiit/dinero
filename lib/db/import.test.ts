@@ -5,6 +5,7 @@ import { buildTransactionsCsv } from "./export";
 import { insertPlannedTransactions, planImportForUser } from "./import";
 import { loadTestEnv, signInAnonymouslyWithRetry } from "./test-env";
 import { TRANSACTION_CSV_HEADERS } from "@/lib/import-transactions";
+import { personalScope } from "@/lib/scope";
 
 // Live round trip: user A's export imported into user B (who has accounts and
 // categories with the same names but none of A's transactions) must
@@ -131,7 +132,7 @@ describe.skipIf(!hasCredentials)("transactions CSV import (live)", () => {
     ]);
     if (error) throw error;
 
-    exported = await buildTransactionsCsv(a.client, a.id);
+    exported = await buildTransactionsCsv(a.client, personalScope(a.id));
   }, 90000);
 
   afterAll(async () => {
@@ -150,24 +151,24 @@ describe.skipIf(!hasCredentials)("transactions CSV import (live)", () => {
   });
 
   it("is idempotent: importing your own export adds nothing", async () => {
-    const plan = await planImportForUser(a.client, a.id, exported);
+    const plan = await planImportForUser(a.client, personalScope(a.id), exported);
     expect(plan.errors).toEqual([]);
     expect(plan.toInsert).toHaveLength(0);
     expect(plan.duplicates).toBe(1005);
   }, 60000);
 
   it("restores a ledger into another user exactly, then is a no-op", async () => {
-    const plan = await planImportForUser(b.client, b.id, exported);
+    const plan = await planImportForUser(b.client, personalScope(b.id), exported);
     expect(plan.errors).toEqual([]);
     expect(plan.duplicates).toBe(0);
     expect(plan.toInsert).toHaveLength(1005);
 
-    await insertPlannedTransactions(b.client, b.id, plan.toInsert);
+    await insertPlannedTransactions(b.client, personalScope(b.id), plan.toInsert);
 
-    const bExport = await buildTransactionsCsv(b.client, b.id);
+    const bExport = await buildTransactionsCsv(b.client, personalScope(b.id));
     expect(sortedLines(bExport)).toEqual(sortedLines(exported));
 
-    const again = await planImportForUser(b.client, b.id, exported);
+    const again = await planImportForUser(b.client, personalScope(b.id), exported);
     expect(again.toInsert).toHaveLength(0);
     expect(again.duplicates).toBe(1005);
   }, 90000);
@@ -179,7 +180,7 @@ describe.skipIf(!hasCredentials)("transactions CSV import (live)", () => {
       "2026-02-01,expense,Ghost,,,1.00,RSD,,bad account",
       "2026-02-01,expense,Wallet,,Nope,1.00,RSD,,bad category",
     ].join("\r\n");
-    const plan = await planImportForUser(b.client, b.id, csv);
+    const plan = await planImportForUser(b.client, personalScope(b.id), csv);
     expect(plan.toInsert).toHaveLength(1);
     expect(plan.errors.map((e) => e.line)).toEqual([3, 4]);
   }, 60000);

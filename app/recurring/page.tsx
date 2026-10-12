@@ -1,4 +1,3 @@
-import { createClient } from "@/lib/supabase/server";
 import { listAccounts } from "@/lib/db/accounts";
 import { listCategories } from "@/lib/db/categories";
 import { listRules } from "@/lib/db/recurring";
@@ -13,14 +12,12 @@ import {
   RecurringManager,
   type RuleItem,
 } from "@/components/recurring/recurring-manager";
+import { getContext } from "@/lib/context";
 
 export default async function RecurringPage() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const ctx = await getContext();
 
-  if (!user) {
+  if (!ctx) {
     return (
       <main className="mx-auto max-w-md p-4">
         <p className="text-sm text-muted-foreground">
@@ -30,10 +27,12 @@ export default async function RecurringPage() {
     );
   }
 
+  const { supabase, scope } = ctx;
+
   const [rules, accounts, categories] = await Promise.all([
-    listRules(supabase, user.id),
-    listAccounts(supabase, user.id),
-    listCategories(supabase, user.id),
+    listRules(supabase, scope),
+    listAccounts(supabase, scope),
+    listCategories(supabase, scope),
   ]);
 
   const accountName = (id: string) => accounts.find((a) => a.id === id)?.name ?? "Unknown account";

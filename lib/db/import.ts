@@ -8,6 +8,7 @@ import {
   type ImportPlan,
   type PlannedTransaction,
 } from "@/lib/import-transactions";
+import { scopeColumns, scopeFilter, type Scope } from "@/lib/scope";
 
 /**
  * Loads what the planner needs and plans the import for one user. Accounts
@@ -16,19 +17,19 @@ import {
  */
 export async function planImportForUser(
   supabase: SupabaseClient<Database>,
-  userId: string,
+  scope: Scope,
   csvText: string,
 ): Promise<ImportPlan> {
   const [accountsRes, categoriesRes, existingRows] = await Promise.all([
     supabase
       .from("accounts")
       .select("id, name, currency")
-      .eq("user_id", userId),
+      .filter(...scopeFilter(scope)),
     supabase
       .from("categories")
       .select("id, name, kind, parent_id")
-      .eq("user_id", userId),
-    fetchAllTransactionRows(supabase, userId),
+      .filter(...scopeFilter(scope)),
+    fetchAllTransactionRows(supabase, scope),
   ]);
   if (accountsRes.error) throw accountsRes.error;
   if (categoriesRes.error) throw categoriesRes.error;
@@ -69,13 +70,13 @@ export async function planImportForUser(
  */
 export async function insertPlannedTransactions(
   supabase: SupabaseClient<Database>,
-  userId: string,
+  scope: Scope,
   rows: PlannedTransaction[],
 ): Promise<void> {
   if (rows.length === 0) return;
   const { error } = await supabase.from("transactions").insert(
     rows.map((r) => ({
-      user_id: userId,
+      ...scopeColumns(scope),
       type: r.type,
       account_id: r.accountId,
       to_account_id: r.toAccountId,

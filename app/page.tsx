@@ -1,5 +1,4 @@
 import { format, startOfMonth } from "date-fns";
-import { createClient } from "@/lib/supabase/server";
 import { listAccounts } from "@/lib/db/accounts";
 import { listCategories } from "@/lib/db/categories";
 import { getMonthlySummary, listRecentTransactions } from "@/lib/db/transactions";
@@ -9,14 +8,12 @@ import { todayInAppTimeZone } from "@/lib/recurring";
 import { DueRecurring, type DueRow } from "@/components/home/due-recurring";
 import { MobileHome } from "@/components/home/mobile-home";
 import { DesktopHome } from "@/components/home/desktop-home";
+import { getContext } from "@/lib/context";
 
 export default async function HomePage() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const ctx = await getContext();
 
-  if (!user) {
+  if (!ctx) {
     return (
       <main className="mx-auto max-w-md p-4">
         <p className="text-sm text-muted-foreground">
@@ -26,20 +23,22 @@ export default async function HomePage() {
     );
   }
 
+  const { supabase, scope } = ctx;
+
   const monthIso = format(startOfMonth(new Date()), "yyyy-MM-dd");
 
   // Auto-post rules first, so what they add is in the numbers below. The
   // layout calls this too; `cache` makes the second call free.
-  await ensureRecurringPosted(user.id);
+  await ensureRecurringPosted();
 
   const [accounts, categories, recentTransactions, monthlySummary, due] =
     await Promise.all([
-      listAccounts(supabase, user.id),
-      listCategories(supabase, user.id),
-      listRecentTransactions(supabase, user.id, 10),
-      getMonthlySummary(supabase, user.id, monthIso),
+      listAccounts(supabase, scope),
+      listCategories(supabase, scope),
+      listRecentTransactions(supabase, scope, 10),
+      getMonthlySummary(supabase, scope, monthIso),
       // A failure here must not take Home down; the prompt just won't show.
-      listDue(supabase, user.id, todayInAppTimeZone()).catch((err) => {
+      listDue(supabase, scope, todayInAppTimeZone()).catch((err) => {
         console.error("recurring: listing due rules failed", err);
         return [];
       }),

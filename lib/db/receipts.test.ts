@@ -5,6 +5,7 @@ import { attachReceipt, getReceiptSignedUrl, removeReceipt } from "./receipts";
 import { createTransaction } from "./transactions";
 import { loadTestEnv, signInAnonymouslyWithRetry } from "./test-env";
 import { RECEIPT_BUCKET, buildReceiptPath } from "@/lib/receipts";
+import { personalScope } from "@/lib/scope";
 
 // Live test of receipt storage. The thing that matters is isolation: the
 // bucket is only as private as its policies, and a policy file on disk is
@@ -29,7 +30,7 @@ describe.skipIf(!hasCredentials)("receipt storage (live)", () => {
 
   async function newTx(): Promise<string> {
     const id = crypto.randomUUID();
-    await createTransaction(a, userA, {
+    await createTransaction(a, personalScope(userA), {
       id,
       type: "expense",
       accountId: accountA,
@@ -102,7 +103,7 @@ describe.skipIf(!hasCredentials)("receipt storage (live)", () => {
     const path = buildReceiptPath(userA, tx, crypto.randomUUID(), "jpg");
     expect((await put(a, path)).error).toBeNull();
 
-    const signed = await getReceiptSignedUrl(a, userA, path);
+    const signed = await getReceiptSignedUrl(a, personalScope(userA), path);
     expect(signed).toBeTruthy();
     const res = await fetch(signed!);
     expect(res.status).toBe(200);
@@ -123,7 +124,7 @@ describe.skipIf(!hasCredentials)("receipt storage (live)", () => {
     expect((await bucket(b).download(path)).error).not.toBeNull();
     expect((await bucket(b).createSignedUrl(path, 60)).error).not.toBeNull();
     // ...and the app-level helper refuses before even asking.
-    expect(await getReceiptSignedUrl(b, userB, path)).toBeNull();
+    expect(await getReceiptSignedUrl(b, personalScope(userB), path)).toBeNull();
 
     // B cannot delete it either (a delete the policy hides removes nothing).
     await bucket(b).remove([path]);
@@ -148,15 +149,15 @@ describe.skipIf(!hasCredentials)("receipt storage (live)", () => {
     await put(a, first);
     await put(a, second);
 
-    await attachReceipt(a, userA, tx, first);
-    await attachReceipt(a, userA, tx, second);
+    await attachReceipt(a, personalScope(userA), tx, first);
+    await attachReceipt(a, personalScope(userA), tx, second);
 
     const { data } = await a.from("transactions").select("receipt_url").eq("id", tx).single();
     expect(data?.receipt_url).toBe(second);
     expect(await exists(first)).toBe(false); // old photo deleted
     expect(await exists(second)).toBe(true);
 
-    await removeReceipt(a, userA, tx);
+    await removeReceipt(a, personalScope(userA), tx);
     const after = await a.from("transactions").select("receipt_url").eq("id", tx).single();
     expect(after.data?.receipt_url).toBeNull();
     expect(await exists(second)).toBe(false);
@@ -166,12 +167,12 @@ describe.skipIf(!hasCredentials)("receipt storage (live)", () => {
     const tx = await newTx();
     const other = await newTx();
     await expect(
-      attachReceipt(a, userA, tx, buildReceiptPath(userB, tx, crypto.randomUUID(), "jpg")),
+      attachReceipt(a, personalScope(userA), tx, buildReceiptPath(userB, tx, crypto.randomUUID(), "jpg")),
     ).rejects.toThrow(/Invalid receipt/);
     await expect(
-      attachReceipt(a, userA, tx, buildReceiptPath(userA, other, crypto.randomUUID(), "jpg")),
+      attachReceipt(a, personalScope(userA), tx, buildReceiptPath(userA, other, crypto.randomUUID(), "jpg")),
     ).rejects.toThrow(/Invalid receipt/);
-    await expect(attachReceipt(a, userA, tx, `${userA}/${tx}/../x.jpg`)).rejects.toThrow(
+    await expect(attachReceipt(a, personalScope(userA), tx, `${userA}/${tx}/../x.jpg`)).rejects.toThrow(
       /Invalid receipt/,
     );
   }, 60000);
@@ -180,7 +181,7 @@ describe.skipIf(!hasCredentials)("receipt storage (live)", () => {
     const id = crypto.randomUUID();
     const path = buildReceiptPath(userA, id, crypto.randomUUID(), "jpg");
     await put(a, path);
-    await createTransaction(a, userA, {
+    await createTransaction(a, personalScope(userA), {
       id,
       receiptPath: path,
       type: "expense",

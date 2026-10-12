@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/database.types";
 import { RECEIPT_BUCKET, isReceiptPathFor } from "@/lib/receipts";
+import { receiptOwnerKey, scopeFilter, type Scope } from "@/lib/scope";
 
 /** How long a signed link to a receipt works. Long enough to look at the
  * photo, short enough that a copied link is not a standing key. */
@@ -11,10 +12,10 @@ const SIGNED_URL_SECONDS = 60 * 60;
  * policy would refuse anyway, but a clear check here keeps this honest. */
 export async function getReceiptSignedUrl(
   supabase: SupabaseClient<Database>,
-  userId: string,
+  scope: Scope,
   path: string,
 ): Promise<string | null> {
-  if (!path.startsWith(`${userId}/`)) return null;
+  if (!path.startsWith(`${receiptOwnerKey(scope)}/`)) return null;
   const { data, error } = await supabase.storage
     .from(RECEIPT_BUCKET)
     .createSignedUrl(path, SIGNED_URL_SECONDS);
@@ -24,14 +25,14 @@ export async function getReceiptSignedUrl(
 
 async function currentReceiptPath(
   supabase: SupabaseClient<Database>,
-  userId: string,
+  scope: Scope,
   transactionId: string,
 ): Promise<string | null> {
   const { data, error } = await supabase
     .from("transactions")
     .select("receipt_url")
     .eq("id", transactionId)
-    .eq("user_id", userId)
+    .filter(...scopeFilter(scope))
     .single();
   if (error) throw error;
   return data.receipt_url;
@@ -56,20 +57,20 @@ async function removeObject(
  */
 export async function attachReceipt(
   supabase: SupabaseClient<Database>,
-  userId: string,
+  scope: Scope,
   transactionId: string,
   path: string,
 ): Promise<void> {
-  if (!isReceiptPathFor(path, userId, transactionId)) {
+  if (!isReceiptPathFor(path, receiptOwnerKey(scope), transactionId)) {
     throw new Error("Invalid receipt.");
   }
-  const previous = await currentReceiptPath(supabase, userId, transactionId);
+  const previous = await currentReceiptPath(supabase, scope, transactionId);
 
   const { error } = await supabase
     .from("transactions")
     .update({ receipt_url: path })
     .eq("id", transactionId)
-    .eq("user_id", userId)
+    .filter(...scopeFilter(scope))
     .is("deleted_at", null);
   if (error) throw error;
 
@@ -79,16 +80,16 @@ export async function attachReceipt(
 /** Clears the receipt from a transaction, then deletes the photo. */
 export async function removeReceipt(
   supabase: SupabaseClient<Database>,
-  userId: string,
+  scope: Scope,
   transactionId: string,
 ): Promise<void> {
-  const previous = await currentReceiptPath(supabase, userId, transactionId);
+  const previous = await currentReceiptPath(supabase, scope, transactionId);
 
   const { error } = await supabase
     .from("transactions")
     .update({ receipt_url: null })
     .eq("id", transactionId)
-    .eq("user_id", userId);
+    .filter(...scopeFilter(scope));
   if (error) throw error;
 
   await removeObject(supabase, previous);

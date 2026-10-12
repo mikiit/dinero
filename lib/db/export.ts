@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/database.types";
 import { toCsv } from "@/lib/csv";
 import { fromDbAmount, toDecimalString } from "@/lib/money";
+import { scopeFilter, type Scope } from "@/lib/scope";
 
 // PostgREST caps a response at 1000 rows by default, so the export pages
 // through the table instead of trusting a single select.
@@ -16,14 +17,14 @@ type TransactionRow = Database["public"]["Tables"]["transactions"]["Row"];
  */
 export async function fetchAllTransactionRows(
   supabase: SupabaseClient<Database>,
-  userId: string,
+  scope: Scope,
 ): Promise<TransactionRow[]> {
   const rows: TransactionRow[] = [];
   for (let from = 0; ; from += PAGE_SIZE) {
     const { data, error } = await supabase
       .from("transactions")
       .select("*")
-      .eq("user_id", userId)
+      .filter(...scopeFilter(scope))
       .is("deleted_at", null)
       .order("occurred_on", { ascending: true })
       .order("created_at", { ascending: true })
@@ -46,14 +47,14 @@ export async function fetchAllTransactionRows(
  */
 export async function buildTransactionsCsv(
   supabase: SupabaseClient<Database>,
-  userId: string,
+  scope: Scope,
 ): Promise<string> {
   const [accountsRes, categoriesRes] = await Promise.all([
-    supabase.from("accounts").select("id, name").eq("user_id", userId),
+    supabase.from("accounts").select("id, name").filter(...scopeFilter(scope)),
     supabase
       .from("categories")
       .select("id, name, parent_id")
-      .eq("user_id", userId),
+      .filter(...scopeFilter(scope)),
   ]);
   if (accountsRes.error) throw accountsRes.error;
   if (categoriesRes.error) throw categoriesRes.error;
@@ -61,7 +62,7 @@ export async function buildTransactionsCsv(
   const accountNames = new Map(accountsRes.data.map((a) => [a.id, a.name]));
   const categories = new Map(categoriesRes.data.map((c) => [c.id, c]));
 
-  const rows = await fetchAllTransactionRows(supabase, userId);
+  const rows = await fetchAllTransactionRows(supabase, scope);
 
   return toCsv(rows, [
     { header: "date", value: (r) => r.occurred_on, text: false },

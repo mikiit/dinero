@@ -2,17 +2,18 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/database.types";
 import { fromDbAmount, toDbAmount } from "@/lib/money";
 import { shiftMonth } from "@/lib/reports";
+import { scopeColumns, scopeFilter, type Scope } from "@/lib/scope";
 
 /** categoryId -> budget amount for one month (first-of-month ISO date). */
 export async function listBudgets(
   supabase: SupabaseClient<Database>,
-  userId: string,
+  scope: Scope,
   monthStartIso: string,
 ): Promise<Map<string, bigint>> {
   const { data, error } = await supabase
     .from("budgets")
     .select("category_id, amount")
-    .eq("user_id", userId)
+    .filter(...scopeFilter(scope))
     .eq("period_month", monthStartIso);
   if (error) throw error;
   return new Map(
@@ -25,14 +26,14 @@ export async function listBudgets(
  * like. */
 async function assertBudgetableCategory(
   supabase: SupabaseClient<Database>,
-  userId: string,
+  scope: Scope,
   categoryId: string,
 ): Promise<void> {
   const { data, error } = await supabase
     .from("categories")
     .select("kind, parent_id")
     .eq("id", categoryId)
-    .eq("user_id", userId)
+    .filter(...scopeFilter(scope))
     .single();
   if (error) throw error;
   if (data.kind !== "expense") {
@@ -43,42 +44,76 @@ async function assertBudgetableCategory(
   }
 }
 
-/** Creates or replaces this month's budget for a category. Idempotent: the
- * (user, category, month) unique key makes a second call an update. */
+const UNIQUE_VIOLATION = "23505";
+
+/** Updates a budget that already exists; returns whether one did. */
+async function updateExistingBudget(
+  supabase: SupabaseClient<Database>,
+  scope: Scope,
+  categoryId: string,
+  monthStartIso: string,
+  amount: bigint,
+): Promise<boolean> {
+  const { data, error } = await supabase
+    .from("budgets")
+    .update({ amount: toDbAmount(amount) })
+    .filter(...scopeFilter(scope))
+    .eq("category_id", categoryId)
+    .eq("period_month", monthStartIso)
+    .select("id");
+  if (error) throw error;
+  return data.length > 0;
+}
+
+/**
+ * Creates or replaces this month's budget for a category in this ledger.
+ * Idempotent: a ledger holds at most one budget per (category, month), so a
+ * second call updates the first.
+ *
+ * Update-then-insert rather than an ON CONFLICT upsert: the uniqueness is
+ * enforced by two PARTIAL unique indexes (personal vs. space), and an
+ * ON CONFLICT column list cannot infer a partial index. If two requests race
+ * and both find nothing to update, the loser's INSERT hits the index
+ * (23505) and simply updates what the winner inserted.
+ */
 export async function setBudget(
   supabase: SupabaseClient<Database>,
-  userId: string,
+  scope: Scope,
   categoryId: string,
   monthStartIso: string,
   amount: bigint,
 ): Promise<void> {
   if (amount < 0n) throw new Error("Budget cannot be negative.");
-  await assertBudgetableCategory(supabase, userId, categoryId);
+  await assertBudgetableCategory(supabase, scope, categoryId);
 
-  const { error } = await supabase.from("budgets").upsert(
-    {
-      user_id: userId,
-      category_id: categoryId,
-      period_month: monthStartIso,
-      amount: toDbAmount(amount),
-    },
-    { onConflict: "user_id,category_id,period_month" },
-  );
-  if (error) throw error;
+  if (await updateExistingBudget(supabase, scope, categoryId, monthStartIso, amount)) {
+    return;
+  }
+
+  const { error } = await supabase.from("budgets").insert({
+    ...scopeColumns(scope),
+    category_id: categoryId,
+    period_month: monthStartIso,
+    amount: toDbAmount(amount),
+  });
+  if (!error) return;
+  if (error.code !== UNIQUE_VIOLATION) throw error;
+
+  await updateExistingBudget(supabase, scope, categoryId, monthStartIso, amount);
 }
 
 /** Removes a budget. budgets has no deleted_at (it's a setting, not ledger
  * data), so this is a real delete - there is no money history to lose. */
 export async function clearBudget(
   supabase: SupabaseClient<Database>,
-  userId: string,
+  scope: Scope,
   categoryId: string,
   monthStartIso: string,
 ): Promise<void> {
   const { error } = await supabase
     .from("budgets")
     .delete()
-    .eq("user_id", userId)
+    .filter(...scopeFilter(scope))
     .eq("category_id", categoryId)
     .eq("period_month", monthStartIso);
   if (error) throw error;
@@ -91,18 +126,18 @@ export async function clearBudget(
  */
 export async function copyPreviousMonthBudgets(
   supabase: SupabaseClient<Database>,
-  userId: string,
+  scope: Scope,
   monthStartIso: string,
 ): Promise<number> {
   const [previous, current] = await Promise.all([
-    listBudgets(supabase, userId, shiftMonth(monthStartIso, -1)),
-    listBudgets(supabase, userId, monthStartIso),
+    listBudgets(supabase, scope, shiftMonth(monthStartIso, -1)),
+    listBudgets(supabase, scope, monthStartIso),
   ]);
 
   const rows = [...previous.entries()]
     .filter(([categoryId]) => !current.has(categoryId))
     .map(([categoryId, amount]) => ({
-      user_id: userId,
+      ...scopeColumns(scope),
       category_id: categoryId,
       period_month: monthStartIso,
       amount: toDbAmount(amount),

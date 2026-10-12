@@ -2,7 +2,6 @@
 
 import { revalidatePath } from "next/cache";
 import { format } from "date-fns";
-import { createClient } from "@/lib/supabase/server";
 import {
   archiveAccount,
   createAccount,
@@ -12,6 +11,7 @@ import {
 } from "@/lib/db/accounts";
 import { createAdjustment } from "@/lib/db/transactions";
 import { toMinor } from "@/lib/money";
+import { requireWriteContext } from "@/lib/context";
 
 export type AccountFormState =
   | { status: "idle" }
@@ -59,13 +59,11 @@ export async function createAccountAction(
   formData: FormData,
 ): Promise<AccountFormState> {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) {
-      return { status: "error", error: "Not signed in." };
+    const gate = await requireWriteContext();
+    if (!gate.ctx) {
+      return { status: "error", error: gate.error };
     }
+    const { supabase, scope } = gate.ctx;
 
     const type = parseAccountType(formData.get("type"));
     const openingBalanceRaw = formData.get("openingBalance");
@@ -74,7 +72,7 @@ export async function createAccountAction(
         ? toMinor(openingBalanceRaw)
         : 0n;
 
-    await createAccount(supabase, user.id, {
+    await createAccount(supabase, scope, {
       name: parseRequiredName(formData.get("name")),
       type,
       openingBalance,
@@ -101,13 +99,11 @@ export async function updateAccountAction(
   formData: FormData,
 ): Promise<AccountFormState> {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) {
-      return { status: "error", error: "Not signed in." };
+    const gate = await requireWriteContext();
+    if (!gate.ctx) {
+      return { status: "error", error: gate.error };
     }
+    const { supabase, scope } = gate.ctx;
 
     const accountId = formData.get("accountId");
     if (typeof accountId !== "string" || accountId === "") {
@@ -120,7 +116,7 @@ export async function updateAccountAction(
     // never written back.
     const type = parseAccountType(formData.get("type"));
 
-    await updateAccount(supabase, user.id, accountId, {
+    await updateAccount(supabase, scope, accountId, {
       name: parseRequiredName(formData.get("name")),
       creditLimit:
         type === "credit" ? parseOptionalMoney(formData.get("creditLimit")) : null,
@@ -141,16 +137,14 @@ export async function updateAccountAction(
 }
 
 export async function archiveAccountAction(formData: FormData): Promise<void> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return;
+  const gate = await requireWriteContext();
+  if (!gate.ctx) return;
+  const { supabase, scope } = gate.ctx;
 
   const accountId = formData.get("accountId");
   if (typeof accountId !== "string" || accountId === "") return;
 
-  await archiveAccount(supabase, user.id, accountId);
+  await archiveAccount(supabase, scope, accountId);
   revalidatePath("/accounts");
 }
 
@@ -176,16 +170,14 @@ export async function setAccountBalanceAction(input: {
   targetBalance: string;
 }): Promise<SetAccountBalanceResult> {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) return { error: "Not signed in." };
+    const gate = await requireWriteContext();
+    if (!gate.ctx) return { error: gate.error };
+    const { supabase, scope } = gate.ctx;
 
     if (!input.accountId) return { error: "Missing account." };
 
     const target = toMinor(input.targetBalance);
-    const current = await getAccountBalance(supabase, user.id, input.accountId);
+    const current = await getAccountBalance(supabase, scope, input.accountId);
     const delta = target - current;
 
     if (delta === 0n) {
@@ -194,7 +186,7 @@ export async function setAccountBalanceAction(input: {
 
     await createAdjustment(
       supabase,
-      user.id,
+      scope,
       input.accountId,
       delta,
       format(new Date(), "yyyy-MM-dd"),

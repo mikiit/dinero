@@ -1,15 +1,12 @@
-import { createClient } from "@/lib/supabase/server";
 import { listAccounts } from "@/lib/db/accounts";
 import { AccountList } from "@/components/accounts/account-list";
 import { AccountDialog } from "@/components/accounts/account-dialog";
+import { getContext } from "@/lib/context";
 
 export default async function AccountsPage() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const ctx = await getContext();
 
-  if (!user) {
+  if (!ctx) {
     return (
       <main className="mx-auto max-w-md p-4">
         <p className="text-sm text-muted-foreground">
@@ -19,7 +16,9 @@ export default async function AccountsPage() {
     );
   }
 
-  const accounts = await listAccounts(supabase, user.id);
+  const { supabase, scope } = ctx;
+
+  const accounts = await listAccounts(supabase, scope);
 
   return (
     <main className="mx-auto max-w-md space-y-4 p-4 lg:max-w-5xl lg:p-8">

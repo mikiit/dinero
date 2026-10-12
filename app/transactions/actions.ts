@@ -1,7 +1,6 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createClient } from "@/lib/supabase/server";
 import {
   createTransaction,
   getMonthlySummary,
@@ -17,6 +16,8 @@ import {
 } from "@/lib/db/transactions";
 import { toMinor } from "@/lib/money";
 import { isReceiptPathFor } from "@/lib/receipts";
+import { receiptOwnerKey } from "@/lib/scope";
+import { getContext, requireWriteContext } from "@/lib/context";
 
 export type CreateTransactionActionInput = {
   /** Client-generated id; required whenever `receiptPath` is set, because
@@ -85,15 +86,14 @@ export async function listTransactionsAction(
   filters: TransactionFilters,
   cursor: TransactionsCursor,
 ): Promise<ListTransactionsResult> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
+  const ctx = await getContext();
+  const gate = { ctx, error: "Not signed in." };
+  if (!gate.ctx) {
     return { transactions: [], nextCursor: null };
   }
+  const { supabase, scope } = gate.ctx;
 
-  const page = await listTransactionsPage(supabase, user.id, filters, cursor);
+  const page = await listTransactionsPage(supabase, scope, filters, cursor);
   return {
     transactions: page.transactions.map((t) => ({
       ...t,
@@ -107,23 +107,21 @@ export async function createTransactionAction(
   input: CreateTransactionActionInput,
 ): Promise<TransactionActionResult> {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) return { error: "Not signed in." };
+    const gate = await requireWriteContext();
+    if (!gate.ctx) return { error: gate.error };
+    const { supabase, scope } = gate.ctx;
 
     const validated = validateTransactionInput(input);
     if ("error" in validated) return validated;
 
     if (
       input.receiptPath &&
-      !(input.id && isReceiptPathFor(input.receiptPath, user.id, input.id))
+      !(input.id && isReceiptPathFor(input.receiptPath, receiptOwnerKey(scope), input.id))
     ) {
       return { error: "Invalid receipt." };
     }
 
-    await createTransaction(supabase, user.id, {
+    await createTransaction(supabase, scope, {
       id: input.id,
       receiptPath: input.receiptPath ?? null,
       type: input.type,
@@ -150,16 +148,14 @@ export async function updateTransactionAction(
   input: UpdateTransactionActionInput,
 ): Promise<TransactionActionResult> {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) return { error: "Not signed in." };
+    const gate = await requireWriteContext();
+    if (!gate.ctx) return { error: gate.error };
+    const { supabase, scope } = gate.ctx;
 
     const validated = validateTransactionInput(input);
     if ("error" in validated) return validated;
 
-    await updateTransaction(supabase, user.id, input.id, {
+    await updateTransaction(supabase, scope, input.id, {
       type: input.type,
       accountId: input.accountId,
       toAccountId: input.type === "transfer" ? input.toAccountId : null,
@@ -184,13 +180,11 @@ export async function deleteTransactionAction(
   id: string,
 ): Promise<TransactionActionResult> {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) return { error: "Not signed in." };
+    const gate = await requireWriteContext();
+    if (!gate.ctx) return { error: gate.error };
+    const { supabase, scope } = gate.ctx;
 
-    await softDeleteTransaction(supabase, user.id, id);
+    await softDeleteTransaction(supabase, scope, id);
   } catch (err) {
     return {
       error:
@@ -207,13 +201,11 @@ export async function restoreTransactionAction(
   id: string,
 ): Promise<TransactionActionResult> {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) return { error: "Not signed in." };
+    const gate = await requireWriteContext();
+    if (!gate.ctx) return { error: gate.error };
+    const { supabase, scope } = gate.ctx;
 
-    await restoreTransaction(supabase, user.id, id);
+    await restoreTransaction(supabase, scope, id);
   } catch (err) {
     return {
       error: err instanceof Error ? err.message : "Failed to undo delete.",
@@ -228,13 +220,12 @@ export async function restoreTransactionAction(
 export async function listRecentTransactionsAction(
   limit = 10,
 ): Promise<TransactionListItem[]> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return [];
+  const ctx = await getContext();
+  const gate = { ctx, error: "Not signed in." };
+  if (!gate.ctx) return [];
+  const { supabase, scope } = gate.ctx;
 
-  const transactions = await listRecentTransactions(supabase, user.id, limit);
+  const transactions = await listRecentTransactions(supabase, scope, limit);
   return transactions.map((t) => ({ ...t, amount: t.amount.toString() }));
 }
 
@@ -243,13 +234,12 @@ export type MonthlySummaryResult = { income: string; expense: string };
 export async function getMonthlySummaryAction(
   monthIso: string,
 ): Promise<MonthlySummaryResult> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { income: "0", expense: "0" };
+  const ctx = await getContext();
+  const gate = { ctx, error: "Not signed in." };
+  if (!gate.ctx) return { income: "0", expense: "0" };
+  const { supabase, scope } = gate.ctx;
 
-  const summary = await getMonthlySummary(supabase, user.id, monthIso);
+  const summary = await getMonthlySummary(supabase, scope, monthIso);
   return {
     income: summary.income.toString(),
     expense: summary.expense.toString(),

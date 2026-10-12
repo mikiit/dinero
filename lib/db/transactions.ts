@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/database.types";
 import { fromDbAmount, toDbAmount } from "@/lib/money";
+import { scopeColumns, scopeFilter, type Scope } from "@/lib/scope";
 
 /** What the Add/Edit Transaction sheet can create - adjustment is its own
  * flow (createAdjustment below, "Set current balance"), though the list
@@ -132,13 +133,13 @@ function beforeTimeIdFilter(createdAt: string, id: string): string {
 /** The category plus its direct children (categories are two-level). */
 async function resolveCategoryIds(
   supabase: SupabaseClient<Database>,
-  userId: string,
+  scope: Scope,
   categoryId: string,
 ): Promise<string[]> {
   const { data, error } = await supabase
     .from("categories")
     .select("id")
-    .eq("user_id", userId)
+    .filter(...scopeFilter(scope))
     .eq("parent_id", categoryId);
   if (error) throw error;
   return [categoryId, ...(data ?? []).map((c) => c.id)];
@@ -154,7 +155,7 @@ async function resolveCategoryIds(
  */
 export async function listTransactionsPage(
   supabase: SupabaseClient<Database>,
-  userId: string,
+  scope: Scope,
   filters: TransactionFilters,
   cursor: TransactionsCursor,
   pageSize = 40,
@@ -164,13 +165,13 @@ export async function listTransactionsPage(
     : null;
 
   const categoryIds = filters.categoryId
-    ? await resolveCategoryIds(supabase, userId, filters.categoryId)
+    ? await resolveCategoryIds(supabase, scope, filters.categoryId)
     : null;
 
   let query = supabase
     .from("transactions")
     .select("*")
-    .eq("user_id", userId)
+    .filter(...scopeFilter(scope))
     .is("deleted_at", null)
     .order("occurred_on", { ascending: false })
     .order("created_at", { ascending: false })
@@ -204,7 +205,7 @@ export async function listTransactionsPage(
     let supplementalQuery = supabase
       .from("transactions")
       .select("*")
-      .eq("user_id", userId)
+      .filter(...scopeFilter(scope))
       .is("deleted_at", null)
       .eq("occurred_on", last.occurred_on)
       .or(beforeTimeIdFilter(last.created_at, last.id))
@@ -264,7 +265,7 @@ export async function listTransactionsPage(
     let probeQuery = supabase
       .from("transactions")
       .select("id")
-      .eq("user_id", userId)
+      .filter(...scopeFilter(scope))
       .is("deleted_at", null)
       .limit(1);
 
@@ -307,21 +308,21 @@ export async function listTransactionsPage(
  */
 export async function createTransaction(
   supabase: SupabaseClient<Database>,
-  userId: string,
+  scope: Scope,
   input: CreateTransactionInput,
 ): Promise<void> {
   const { data: account, error: accountError } = await supabase
     .from("accounts")
     .select("currency")
     .eq("id", input.accountId)
-    .eq("user_id", userId)
+    .filter(...scopeFilter(scope))
     .single();
 
   if (accountError) throw accountError;
 
   const { error } = await supabase.from("transactions").insert({
     ...(input.id ? { id: input.id } : {}),
-    user_id: userId,
+    ...scopeColumns(scope),
     type: input.type,
     account_id: input.accountId,
     to_account_id: input.type === "transfer" ? (input.toAccountId ?? null) : null,
@@ -338,7 +339,7 @@ export async function createTransaction(
 
 export async function updateTransaction(
   supabase: SupabaseClient<Database>,
-  userId: string,
+  scope: Scope,
   transactionId: string,
   input: UpdateTransactionInput,
 ): Promise<void> {
@@ -346,7 +347,7 @@ export async function updateTransaction(
     .from("accounts")
     .select("currency")
     .eq("id", input.accountId)
-    .eq("user_id", userId)
+    .filter(...scopeFilter(scope))
     .single();
 
   if (accountError) throw accountError;
@@ -364,35 +365,35 @@ export async function updateTransaction(
       note: input.note ?? null,
     })
     .eq("id", transactionId)
-    .eq("user_id", userId);
+    .filter(...scopeFilter(scope));
 
   if (error) throw error;
 }
 
 export async function softDeleteTransaction(
   supabase: SupabaseClient<Database>,
-  userId: string,
+  scope: Scope,
   transactionId: string,
 ): Promise<void> {
   const { error } = await supabase
     .from("transactions")
     .update({ deleted_at: new Date().toISOString() })
     .eq("id", transactionId)
-    .eq("user_id", userId);
+    .filter(...scopeFilter(scope));
 
   if (error) throw error;
 }
 
 export async function restoreTransaction(
   supabase: SupabaseClient<Database>,
-  userId: string,
+  scope: Scope,
   transactionId: string,
 ): Promise<void> {
   const { error } = await supabase
     .from("transactions")
     .update({ deleted_at: null })
     .eq("id", transactionId)
-    .eq("user_id", userId);
+    .filter(...scopeFilter(scope));
 
   if (error) throw error;
 }
@@ -406,13 +407,13 @@ export async function restoreTransaction(
  */
 export async function listRecentTransactions(
   supabase: SupabaseClient<Database>,
-  userId: string,
+  scope: Scope,
   limit = 10,
 ): Promise<Transaction[]> {
   const { data, error } = await supabase
     .from("transactions")
     .select("*")
-    .eq("user_id", userId)
+    .filter(...scopeFilter(scope))
     .is("deleted_at", null)
     .order("occurred_on", { ascending: false })
     .order("created_at", { ascending: false })
@@ -436,13 +437,13 @@ export type MonthlySummary = {
  */
 export async function getMonthlySummary(
   supabase: SupabaseClient<Database>,
-  userId: string,
+  scope: Scope,
   monthIso: string,
 ): Promise<MonthlySummary> {
   const { data, error } = await supabase
     .from("monthly_summary")
     .select("income, expense")
-    .eq("user_id", userId)
+    .filter(...scopeFilter(scope))
     .eq("month", monthIso)
     .maybeSingle();
 
@@ -464,7 +465,7 @@ export async function getMonthlySummary(
  */
 export async function createAdjustment(
   supabase: SupabaseClient<Database>,
-  userId: string,
+  scope: Scope,
   accountId: string,
   delta: bigint,
   occurredOn: string,
@@ -473,13 +474,13 @@ export async function createAdjustment(
     .from("accounts")
     .select("currency")
     .eq("id", accountId)
-    .eq("user_id", userId)
+    .filter(...scopeFilter(scope))
     .single();
 
   if (accountError) throw accountError;
 
   const { error } = await supabase.from("transactions").insert({
-    user_id: userId,
+    ...scopeColumns(scope),
     type: "adjustment",
     account_id: accountId,
     category_id: null,
