@@ -6,7 +6,9 @@ import { createClient } from "@/lib/supabase/client";
 
 type Pending = "link" | "signin" | null;
 
-export function GoogleAuthButtons() {
+export function GoogleAuthButtons({ next }: { next?: string | null }) {
+  const redirectTo = () =>
+    `${window.location.origin}/auth/callback${next ? `?next=${encodeURIComponent(next)}` : ""}`;
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState<Pending>(null);
 
@@ -20,7 +22,7 @@ export function GoogleAuthButtons() {
     // rather than handing back a URL to redirect manually.
     const { error } = await supabase.auth.linkIdentity({
       provider: "google",
-      options: { redirectTo: `${window.location.origin}/auth/callback` },
+      options: { redirectTo: redirectTo() },
     });
     if (error) {
       setError(error.message);
@@ -34,7 +36,7 @@ export function GoogleAuthButtons() {
     const supabase = createClient();
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
-      options: { redirectTo: `${window.location.origin}/auth/callback` },
+      options: { redirectTo: redirectTo() },
     });
     if (error) {
       setError(error.message);

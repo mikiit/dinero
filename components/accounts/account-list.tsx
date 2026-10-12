@@ -13,7 +13,14 @@ const ACCOUNT_TYPE_LABELS: Record<Account["type"], string> = {
   savings: "Savings",
 };
 
-export function AccountList({ accounts }: { accounts: Account[] }) {
+export function AccountList({
+  accounts,
+  readOnly = false,
+}: {
+  accounts: Account[];
+  /** A viewer in a shared space: nothing to edit. */
+  readOnly?: boolean;
+}) {
   if (accounts.length === 0) {
     return (
       <p className="text-sm text-muted-foreground">
@@ -82,11 +89,13 @@ export function AccountList({ accounts }: { accounts: Account[] }) {
                     )}
                   </CardContent>
                 )}
-              <CardContent className="flex flex-wrap justify-end gap-2 pt-0">
-                <SetBalanceDialog account={account} />
-                <AccountDialog account={account} />
-                <ArchiveAccountButton accountId={account.id} />
-              </CardContent>
+              {!readOnly && (
+                <CardContent className="flex flex-wrap justify-end gap-2 pt-0">
+                  <SetBalanceDialog account={account} />
+                  <AccountDialog account={account} />
+                  <ArchiveAccountButton accountId={account.id} />
+                </CardContent>
+              )}
             </Card>
           </li>
         );

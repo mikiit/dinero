@@ -23,9 +23,11 @@ export type BudgetRowData = {
 function BudgetRow({
   row,
   monthStartIso,
+  readOnly,
 }: {
   row: BudgetRowData;
   monthStartIso: string;
+  readOnly: boolean;
 }) {
   const saved = row.budget === null ? "" : toDecimalString(row.budget);
   const [value, setValue] = useState(saved);
@@ -69,13 +71,14 @@ function BudgetRow({
           placeholder="No budget"
           aria-label={`Budget for ${row.name}`}
           value={value}
+          disabled={readOnly}
           onChange={(e) => {
             setValue(e.target.value);
             setMessage(null);
           }}
           className="font-mono"
         />
-        <Button type="submit" size="sm" disabled={!dirty || isPending}>
+        <Button type="submit" size="sm" disabled={readOnly || !dirty || isPending}>
           {isPending ? "Saving…" : "Save"}
         </Button>
       </form>
@@ -98,9 +101,11 @@ function BudgetRow({
 export function BudgetEditor({
   rows,
   monthStartIso,
+  readOnly = false,
 }: {
   rows: BudgetRowData[];
   monthStartIso: string;
+  readOnly?: boolean;
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -130,7 +135,7 @@ export function BudgetEditor({
           variant="outline"
           size="sm"
           onClick={copyPrevious}
-          disabled={isPending}
+          disabled={isPending || readOnly}
         >
           {isPending ? "Copying…" : "Copy last month's budgets"}
         </Button>
@@ -158,6 +163,7 @@ export function BudgetEditor({
               key={`${monthStartIso}-${row.categoryId}-${String(row.budget)}`}
               row={row}
               monthStartIso={monthStartIso}
+              readOnly={readOnly}
             />
           ))}
         </ul>

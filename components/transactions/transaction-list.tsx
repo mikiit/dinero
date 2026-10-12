@@ -31,6 +31,7 @@ import {
 import { TransactionFilterBar } from "@/components/transactions/transaction-filter-bar";
 import { EditTransactionSheet } from "@/components/transactions/edit-transaction-sheet";
 import { UndoToast } from "@/components/transactions/undo-toast";
+import { useLedger } from "@/components/spaces/ledger-provider";
 import type { TransactionFormState } from "@/components/transactions/transaction-form-fields";
 
 type RowIssue = { message: string; retry: () => void };
@@ -184,6 +185,7 @@ function TransactionListResults({
     Record<string, Partial<TransactionListItem>>
   >({});
   const [rowIssues, setRowIssues] = useState<Record<string, RowIssue>>({});
+  const { canWrite } = useLedger();
   const [editingTransaction, setEditingTransaction] =
     useState<TransactionListItem | null>(null);
   const [sort, setSort] = useState<SortState>({ column: "date", direction: "desc" });
@@ -423,7 +425,7 @@ function TransactionListResults({
                       <button
                         type="button"
                         className="flex min-w-0 flex-1 items-center gap-2 text-left disabled:cursor-default"
-                        disabled={!isExpense && !isIncome}
+                        disabled={(!isExpense && !isIncome) || !canWrite}
                         onClick={() => {
                           if (isExpense || isIncome) setEditingTransaction(t);
                         }}
@@ -468,14 +470,16 @@ function TransactionListResults({
                             showUnit={false}
                           />
                         </span>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleDelete(t)}
-                        >
-                          Delete
-                        </Button>
+                        {canWrite && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDelete(t)}
+                          >
+                            Delete
+                          </Button>
+                        )}
                       </div>
                     </div>
                     {issue && (
@@ -539,8 +543,8 @@ function TransactionListResults({
                   <td className="max-w-0 py-2.5">
                     <button
                       type="button"
-                      disabled={!editable}
-                      onClick={() => editable && setEditingTransaction(t)}
+                      disabled={!editable || !canWrite}
+                      onClick={() => editable && canWrite && setEditingTransaction(t)}
                       className="flex w-full min-w-0 items-center gap-2 text-left disabled:cursor-default"
                     >
                       <span
@@ -600,15 +604,17 @@ function TransactionListResults({
                     />
                   </td>
                   <td className="py-2.5 text-right">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="opacity-0 group-hover:opacity-100"
-                      onClick={() => handleDelete(t)}
-                    >
-                      Delete
-                    </Button>
+                    {canWrite && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="opacity-0 group-hover:opacity-100"
+                        onClick={() => handleDelete(t)}
+                      >
+                        Delete
+                      </Button>
+                    )}
                   </td>
                 </tr>
               );

@@ -78,6 +78,7 @@ export default async function RecurringPage() {
         accounts={accounts}
         categories={categories}
         today={todayInAppTimeZone()}
+        readOnly={!ctx.canWrite}
       />
     </main>
   );

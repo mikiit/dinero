@@ -63,7 +63,7 @@ export default async function BudgetsPage({
         allowFuture
       />
 
-      <BudgetEditor rows={rows} monthStartIso={month} />
+      <BudgetEditor rows={rows} monthStartIso={month} readOnly={!ctx.canWrite} />
     </main>
   );
 }

@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { AddTransactionSheet } from "@/components/transactions/add-transaction-sheet";
+import { useLedger } from "@/components/spaces/ledger-provider";
 import type { Account } from "@/lib/db/accounts";
 import type { Category } from "@/lib/db/categories";
 
@@ -50,6 +51,7 @@ export function BottomTabBar({
 }) {
   const pathname = usePathname();
   const [error, setError] = useState<string | null>(null);
+  const { canWrite } = useLedger();
 
   return (
     <>
@@ -79,6 +81,7 @@ export function BottomTabBar({
         />
 
         <div className="flex flex-1 items-center justify-center">
+          {canWrite && (
           <AddTransactionSheet
             accounts={accounts}
             categories={categories}
@@ -93,6 +96,7 @@ export function BottomTabBar({
               </button>
             }
           />
+          )}
         </div>
 
         <NavLink

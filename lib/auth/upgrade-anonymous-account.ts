@@ -12,8 +12,16 @@ export async function upgradeAnonymousAccount(
   supabase: SupabaseClient<Database>,
   email: string,
   password: string,
+  options?: { emailRedirectTo?: string },
 ) {
-  const { data, error } = await supabase.auth.updateUser({ email, password });
+  // The confirmation email's link lands on `emailRedirectTo` when given, so
+  // the user returns to where they were (e.g. an invite) after confirming.
+  const { data, error } = options?.emailRedirectTo
+    ? await supabase.auth.updateUser(
+        { email, password },
+        { emailRedirectTo: options.emailRedirectTo },
+      )
+    : await supabase.auth.updateUser({ email, password });
 
   if (error) {
     throw error;

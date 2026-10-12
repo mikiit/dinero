@@ -15,6 +15,7 @@ import {
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { AddTransactionSheet } from "@/components/transactions/add-transaction-sheet";
+import { useLedger } from "@/components/spaces/ledger-provider";
 import type { Account } from "@/lib/db/accounts";
 import type { Category } from "@/lib/db/categories";
 
@@ -48,6 +49,7 @@ export function Sidebar({
 }) {
   const pathname = usePathname();
   const [error, setError] = useState<string | null>(null);
+  const { canWrite } = useLedger();
 
   return (
     <>
@@ -72,6 +74,7 @@ export function Sidebar({
         </div>
 
         <div className="px-4 pb-2">
+          {canWrite && (
           <AddTransactionSheet
             accounts={accounts}
             categories={categories}
@@ -83,6 +86,7 @@ export function Sidebar({
               </Button>
             }
           />
+          )}
         </div>
 
         <nav aria-label="Primary" className="flex-1 space-y-0.5 px-3 py-2">

@@ -240,9 +240,11 @@ function RuleForm({
 function RuleRow({
   rule,
   onEdit,
+  readOnly,
 }: {
   rule: RuleItem;
   onEdit: () => void;
+  readOnly: boolean;
 }) {
   const [error, setError] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -292,6 +294,7 @@ function RuleRow({
         {rule.autoPost ? "posts automatically" : "asks you first"}
       </p>
 
+      {!readOnly && (
       <div className="flex flex-wrap gap-2">
         <Button variant="outline" size="sm" onClick={onEdit} disabled={isPending}>
           Edit
@@ -326,6 +329,7 @@ function RuleRow({
           </Button>
         )}
       </div>
+      )}
       {confirmDelete && (
         <p className="text-xs text-muted-foreground">
           Transactions this rule already posted stay in your ledger.
@@ -345,11 +349,13 @@ export function RecurringManager({
   accounts,
   categories,
   today,
+  readOnly = false,
 }: {
   rules: RuleItem[];
   accounts: Account[];
   categories: Category[];
   today: string;
+  readOnly?: boolean;
 }) {
   // null = closed, "new" = creating, otherwise the rule being edited.
   const [editing, setEditing] = useState<RuleItem | "new" | null>(null);
@@ -363,7 +369,7 @@ export function RecurringManager({
 
   return (
     <div className="space-y-4">
-      {accounts.length === 0 ? (
+      {readOnly ? null : accounts.length === 0 ? (
         <p className="text-sm text-muted-foreground">
           Add an account before creating a recurring rule.
         </p>
@@ -381,7 +387,12 @@ export function RecurringManager({
       ) : (
         <ul className="divide-y rounded-lg border">
           {rules.map((rule) => (
-            <RuleRow key={rule.id} rule={rule} onEdit={() => setEditing(rule)} />
+            <RuleRow
+              key={rule.id}
+              rule={rule}
+              onEdit={() => setEditing(rule)}
+              readOnly={readOnly}
+            />
           ))}
         </ul>
       )}

@@ -20,7 +20,7 @@ const MIN_PASSWORD_LENGTH = 8;
  *  - "Sign in" switches this device to an account that already exists; what
  *    the temporary session held stays behind in it.
  */
-export function EmailAuthForm() {
+export function EmailAuthForm({ next }: { next?: string | null }) {
   const [mode, setMode] = useState<Mode>("create");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -45,15 +45,22 @@ export function EmailAuthForm() {
         await signInWithPassword(supabase, email.trim(), password);
         // Full reload, not a soft navigation: nothing from the previous
         // (temporary) session may linger in already-mounted client state.
-        // eslint-disable-next-line @next/next/no-location-assign-relative-destination
-        window.location.href = "/";
+        window.location.href = next ?? "/";
         return;
       }
 
-      const user = await upgradeAnonymousAccount(supabase, email.trim(), password);
+      const user = await upgradeAnonymousAccount(
+        supabase,
+        email.trim(),
+        password,
+        next
+          ? {
+              emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`,
+            }
+          : undefined,
+      );
       if (user.is_anonymous === false) {
-        // eslint-disable-next-line @next/next/no-location-assign-relative-destination
-        window.location.href = "/settings";
+        window.location.href = next ?? "/settings";
         return;
       }
       // Projects that require confirmation keep the account temporary until

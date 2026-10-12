@@ -4,12 +4,15 @@ import { ThemeToggle } from "@/components/settings/theme-toggle";
 import { AccountSection } from "@/components/settings/account-section";
 import { ImportSection } from "@/components/settings/import-section";
 import { InstallApp } from "@/components/pwa/install-app";
+import { getContext } from "@/lib/context";
 
 export default async function SettingsPage() {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
+  // Importing writes to the active ledger; a viewer of a shared space can't.
+  const canWrite = (await getContext())?.canWrite ?? true;
 
   return (
     <main className="mx-auto max-w-md space-y-6 p-4 lg:max-w-xl lg:p-8">
@@ -58,6 +61,11 @@ export default async function SettingsPage() {
               Recurring
             </Link>
           </li>
+          <li>
+            <Link href="/spaces" className="block p-3 text-sm">
+              Shared spaces
+            </Link>
+          </li>
         </ul>
       </div>
 
@@ -75,7 +83,7 @@ export default async function SettingsPage() {
             </a>
           </li>
         </ul>
-        <ImportSection />
+        {canWrite && <ImportSection />}
       </div>
 
       <p className="text-sm text-muted-foreground">

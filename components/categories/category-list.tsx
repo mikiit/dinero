@@ -18,12 +18,14 @@ function CategoryRow({
   disableUp,
   disableDown,
   indented,
+  readOnly,
 }: {
   category: Category;
   allCategories: Category[];
   disableUp: boolean;
   disableDown: boolean;
   indented: boolean;
+  readOnly: boolean;
 }) {
   return (
     <li className={indented ? "ml-6" : undefined}>
@@ -36,21 +38,29 @@ function CategoryRow({
           {category.icon && <span>{category.icon}</span>}
           <span className="truncate text-sm">{category.name}</span>
         </div>
-        <div className="flex shrink-0 items-center gap-1">
-          <MoveCategoryButtons
-            categoryId={category.id}
-            disableUp={disableUp}
-            disableDown={disableDown}
-          />
-          <CategoryDialog category={category} allCategories={allCategories} />
-          <ArchiveCategoryButton categoryId={category.id} />
-        </div>
+        {!readOnly && (
+          <div className="flex shrink-0 items-center gap-1">
+            <MoveCategoryButtons
+              categoryId={category.id}
+              disableUp={disableUp}
+              disableDown={disableDown}
+            />
+            <CategoryDialog category={category} allCategories={allCategories} />
+            <ArchiveCategoryButton categoryId={category.id} />
+          </div>
+        )}
       </div>
     </li>
   );
 }
 
-export function CategoryList({ categories }: { categories: Category[] }) {
+export function CategoryList({
+  categories,
+  readOnly = false,
+}: {
+  categories: Category[];
+  readOnly?: boolean;
+}) {
   if (categories.length === 0) {
     return <p className="text-sm text-muted-foreground">No categories yet.</p>;
   }
@@ -82,6 +92,7 @@ export function CategoryList({ categories }: { categories: Category[] }) {
                         disableUp={parentIndex === 0}
                         disableDown={parentIndex === topLevel.length - 1}
                         indented={false}
+                        readOnly={readOnly}
                       />
                       {children.map((child, childIndex) => (
                         <CategoryRow
@@ -91,6 +102,7 @@ export function CategoryList({ categories }: { categories: Category[] }) {
                           disableUp={childIndex === 0}
                           disableDown={childIndex === children.length - 1}
                           indented
+                          readOnly={readOnly}
                         />
                       ))}
                     </Fragment>
