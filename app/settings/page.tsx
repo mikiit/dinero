@@ -45,6 +45,11 @@ export default async function SettingsPage() {
               Budgets
             </Link>
           </li>
+          <li>
+            <Link href="/recurring" className="block p-3 text-sm">
+              Recurring
+            </Link>
+          </li>
         </ul>
       </div>
 

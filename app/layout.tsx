@@ -6,6 +6,7 @@ import { Sidebar } from "@/components/nav/sidebar";
 import { createClient } from "@/lib/supabase/server";
 import { listAccounts } from "@/lib/db/accounts";
 import { listCategories } from "@/lib/db/categories";
+import { ensureRecurringPosted } from "@/lib/recurring-sync";
 import { themeInitScript } from "@/lib/theme";
 import "./globals.css";
 
@@ -42,6 +43,10 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
   const {
     data: { user },
   } = await supabase.auth.getUser();
+
+  // Before the balance reads below, so a rule that came due is already in
+  // the ledger when they are computed.
+  if (user) await ensureRecurringPosted(user.id);
 
   const [accounts, categories] = user
     ? await Promise.all([

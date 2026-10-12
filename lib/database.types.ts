@@ -201,6 +201,7 @@ export type Database = {
           auto_post: boolean
           created_at: string
           day_of_month: number | null
+          deleted_at: string | null
           end_on: string | null
           frequency: string
           id: string
@@ -214,6 +215,7 @@ export type Database = {
           auto_post?: boolean
           created_at?: string
           day_of_month?: number | null
+          deleted_at?: string | null
           end_on?: string | null
           frequency: string
           id?: string
@@ -227,6 +229,7 @@ export type Database = {
           auto_post?: boolean
           created_at?: string
           day_of_month?: number | null
+          deleted_at?: string | null
           end_on?: string | null
           frequency?: string
           id?: string

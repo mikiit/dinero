@@ -58,6 +58,8 @@ export function TransactionFormFields({
   autoFocusAmount = false,
   error,
   allowedTypes = TRANSACTION_TYPES,
+  dateLabel = "Date",
+  children,
 }: {
   state: TransactionFormState;
   onChange: (next: Partial<TransactionFormState>) => void;
@@ -71,6 +73,10 @@ export function TransactionFormFields({
    * flow, so transfer is left out of that toggle entirely rather than
    * exposed and then rejected. */
   allowedTypes?: TransactionType[];
+  /** Recurring rules reuse this form and call the date "Next date". */
+  dateLabel?: string;
+  /** Extra fields rendered inside the scrolling area, below the note. */
+  children?: React.ReactNode;
 }) {
   const isTransfer = state.type === "transfer";
   const categoryOptions = isTransfer
@@ -191,7 +197,7 @@ export function TransactionFormFields({
       )}
 
       <div className="space-y-1.5">
-        <Label htmlFor="occurredOn">Date</Label>
+        <Label htmlFor="occurredOn">{dateLabel}</Label>
         <Input
           id="occurredOn"
           type="date"
@@ -209,6 +215,8 @@ export function TransactionFormFields({
           placeholder="Optional note"
         />
       </div>
+
+      {children}
 
       {error && <p className="text-sm text-destructive">{error}</p>}
     </div>
