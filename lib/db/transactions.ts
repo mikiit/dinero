@@ -23,7 +23,11 @@ export type Transaction = {
 
 export type TransactionFilters = {
   accountId?: string;
+  /** Matches this category AND its sub-categories - filtering a parent
+   * means "everything under it", which is what Reports' drill-down needs. */
   categoryId?: string;
+  /** Only rows with no category (Reports' "Uncategorized" slice). */
+  uncategorized?: boolean;
   type?: AnyTransactionType;
   /** Inclusive, YYYY-MM-DD. */
   dateFrom?: string;
@@ -116,6 +120,21 @@ function beforeTimeIdFilter(createdAt: string, id: string): string {
   );
 }
 
+/** The category plus its direct children (categories are two-level). */
+async function resolveCategoryIds(
+  supabase: SupabaseClient<Database>,
+  userId: string,
+  categoryId: string,
+): Promise<string[]> {
+  const { data, error } = await supabase
+    .from("categories")
+    .select("id")
+    .eq("user_id", userId)
+    .eq("parent_id", categoryId);
+  if (error) throw error;
+  return [categoryId, ...(data ?? []).map((c) => c.id)];
+}
+
 /**
  * Fetches one page of transactions, most recent first, grouped-by-day-safe:
  * if the page's last row shares its occurred_on with rows beyond the page
@@ -135,6 +154,10 @@ export async function listTransactionsPage(
     ? sanitizeSearchTerm(filters.search.trim())
     : null;
 
+  const categoryIds = filters.categoryId
+    ? await resolveCategoryIds(supabase, userId, filters.categoryId)
+    : null;
+
   let query = supabase
     .from("transactions")
     .select("*")
@@ -146,7 +169,8 @@ export async function listTransactionsPage(
     .limit(pageSize);
 
   if (filters.accountId) query = query.eq("account_id", filters.accountId);
-  if (filters.categoryId) query = query.eq("category_id", filters.categoryId);
+  if (categoryIds) query = query.in("category_id", categoryIds);
+  if (filters.uncategorized) query = query.is("category_id", null);
   if (filters.type) query = query.eq("type", filters.type);
   if (filters.dateFrom) query = query.gte("occurred_on", filters.dateFrom);
   if (filters.dateTo) query = query.lte("occurred_on", filters.dateTo);
@@ -181,11 +205,11 @@ export async function listTransactionsPage(
     if (filters.accountId) {
       supplementalQuery = supplementalQuery.eq("account_id", filters.accountId);
     }
-    if (filters.categoryId) {
-      supplementalQuery = supplementalQuery.eq(
-        "category_id",
-        filters.categoryId,
-      );
+    if (categoryIds) {
+      supplementalQuery = supplementalQuery.in("category_id", categoryIds);
+    }
+    if (filters.uncategorized) {
+      supplementalQuery = supplementalQuery.is("category_id", null);
     }
     if (filters.type) {
       supplementalQuery = supplementalQuery.eq("type", filters.type);
@@ -236,7 +260,8 @@ export async function listTransactionsPage(
       .limit(1);
 
     if (filters.accountId) probeQuery = probeQuery.eq("account_id", filters.accountId);
-    if (filters.categoryId) probeQuery = probeQuery.eq("category_id", filters.categoryId);
+    if (categoryIds) probeQuery = probeQuery.in("category_id", categoryIds);
+    if (filters.uncategorized) probeQuery = probeQuery.is("category_id", null);
     if (filters.type) probeQuery = probeQuery.eq("type", filters.type);
     if (filters.dateFrom) probeQuery = probeQuery.gte("occurred_on", filters.dateFrom);
     if (filters.dateTo) probeQuery = probeQuery.lte("occurred_on", filters.dateTo);

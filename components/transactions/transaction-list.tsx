@@ -134,11 +134,14 @@ function dayTotal(transactions: TransactionListItem[]): bigint {
 export function TransactionList({
   accounts,
   categories,
+  initialFilters = {},
 }: {
   accounts: Account[];
   categories: Category[];
+  /** Pre-applied filters, e.g. from a Reports drill-down link. */
+  initialFilters?: TransactionFilters;
 }) {
-  const [filters, setFilters] = useState<TransactionFilters>({});
+  const [filters, setFilters] = useState<TransactionFilters>(initialFilters);
 
   return (
     <div className="space-y-4">

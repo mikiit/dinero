@@ -95,11 +95,17 @@ export function TransactionFilterBar({
         </Select>
 
         <Select
-          value={filters.categoryId ?? "all"}
+          value={
+            filters.uncategorized ? "uncategorized" : (filters.categoryId ?? "all")
+          }
           onValueChange={(value) =>
             onChange({
               ...filters,
-              categoryId: value === "all" ? undefined : (value as string),
+              categoryId:
+                value === "all" || value === "uncategorized"
+                  ? undefined
+                  : (value as string),
+              uncategorized: value === "uncategorized" ? true : undefined,
             })
           }
         >
@@ -108,13 +114,16 @@ export function TransactionFilterBar({
               {(value: string) =>
                 value === "all"
                   ? "All categories"
-                  : (allCategoryOptions.find((c) => c.id === value)?.label ??
+                  : value === "uncategorized"
+                    ? "Uncategorized"
+                    : (allCategoryOptions.find((c) => c.id === value)?.label ??
                     "All categories")
               }
             </SelectValue>
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All categories</SelectItem>
+            <SelectItem value="uncategorized">Uncategorized</SelectItem>
             {allCategoryOptions.map((c) => (
               <SelectItem key={c.id} value={c.id}>
                 {c.label}
