@@ -3,6 +3,7 @@ import type { Database } from "@/lib/database.types";
 import { CURRENCIES, DEFAULT_CURRENCY, toCurrency, type Currency } from "@/lib/currency";
 import { fromDbAmount, toDbAmount } from "@/lib/money";
 import { scopeColumns, scopeFilter, type Scope } from "@/lib/scope";
+import { parseTags } from "@/lib/tags";
 
 /** What the Add/Edit Transaction sheet can create - adjustment is its own
  * flow (createAdjustment below, "Set current balance"), though the list
@@ -28,6 +29,8 @@ export type Transaction = {
   merchant: string | null;
   /** Storage path of the receipt photo (see lib/receipts.ts), or null. */
   receiptPath: string | null;
+  /** Normalized labels (see lib/tags.ts); empty when none. */
+  tags: string[];
 };
 
 export type TransactionFilters = {
@@ -44,6 +47,8 @@ export type TransactionFilters = {
   dateTo?: string;
   /** Matched against note OR merchant, case-insensitive substring. */
   search?: string;
+  /** Only rows carrying this tag. */
+  tag?: string;
 };
 
 export type TransactionsCursor = {
@@ -83,6 +88,8 @@ export type CreateTransactionInput = {
   toAmount?: bigint | null;
   occurredOn: string;
   note?: string | null;
+  /** Already normalized (parseTags). */
+  tags?: string[];
 };
 
 export type UpdateTransactionInput = CreateTransactionInput;
@@ -103,6 +110,7 @@ function toTransaction(
     note: row.note,
     merchant: row.merchant,
     receiptPath: row.receipt_url,
+    tags: row.tags ?? [],
   };
 }
 
@@ -175,6 +183,10 @@ export async function listTransactionsPage(
     ? sanitizeSearchTerm(filters.search.trim())
     : null;
 
+  // Normalized again here: a tag goes into an array literal in the query, so
+  // it must never carry commas or braces whatever the caller sent.
+  const tag = filters.tag ? parseTags(filters.tag)[0] : undefined;
+
   const categoryIds = filters.categoryId
     ? await resolveCategoryIds(supabase, scope, filters.categoryId)
     : null;
@@ -193,6 +205,7 @@ export async function listTransactionsPage(
   if (categoryIds) query = query.in("category_id", categoryIds);
   if (filters.uncategorized) query = query.is("category_id", null);
   if (filters.type) query = query.eq("type", filters.type);
+  if (tag) query = query.contains("tags", [tag]);
   if (filters.dateFrom) query = query.gte("occurred_on", filters.dateFrom);
   if (filters.dateTo) query = query.lte("occurred_on", filters.dateTo);
   if (searchPattern) {
@@ -235,6 +248,7 @@ export async function listTransactionsPage(
     if (filters.type) {
       supplementalQuery = supplementalQuery.eq("type", filters.type);
     }
+    if (tag) supplementalQuery = supplementalQuery.contains("tags", [tag]);
     if (filters.dateFrom) {
       supplementalQuery = supplementalQuery.gte(
         "occurred_on",
@@ -284,6 +298,7 @@ export async function listTransactionsPage(
     if (categoryIds) probeQuery = probeQuery.in("category_id", categoryIds);
     if (filters.uncategorized) probeQuery = probeQuery.is("category_id", null);
     if (filters.type) probeQuery = probeQuery.eq("type", filters.type);
+    if (tag) probeQuery = probeQuery.contains("tags", [tag]);
     if (filters.dateFrom) probeQuery = probeQuery.gte("occurred_on", filters.dateFrom);
     if (filters.dateTo) probeQuery = probeQuery.lte("occurred_on", filters.dateTo);
     if (searchPattern) {
@@ -374,6 +389,7 @@ export async function createTransaction(
     to_amount: legs.toAmount === null ? null : toDbAmount(legs.toAmount),
     occurred_on: input.occurredOn,
     note: input.note ?? null,
+    tags: input.tags?.length ? input.tags : null,
     receipt_url: input.receiptPath ?? null,
   });
 
@@ -400,6 +416,7 @@ export async function updateTransaction(
       to_amount: legs.toAmount === null ? null : toDbAmount(legs.toAmount),
       occurred_on: input.occurredOn,
       note: input.note ?? null,
+      tags: input.tags?.length ? input.tags : null,
     })
     .eq("id", transactionId)
     .filter(...scopeFilter(scope));

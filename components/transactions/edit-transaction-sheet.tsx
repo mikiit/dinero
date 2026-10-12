@@ -25,6 +25,7 @@ import {
   attachReceiptAction,
   removeReceiptAction,
 } from "@/app/transactions/receipt-actions";
+import { formatTags } from "@/lib/tags";
 
 // Only reachable for expense/income rows (transaction-list.tsx disables
 // opening this sheet for transfer/adjustment), so toAccountId is always
@@ -40,6 +41,7 @@ function toFormState(transaction: TransactionListItem): TransactionFormState {
     // major-unit decimal string, so this gets reformatted below.
     occurredOn: transaction.occurredOn,
     note: transaction.note ?? "",
+    tags: formatTags(transaction.tags),
   };
 }
 
@@ -118,6 +120,7 @@ function EditTransactionForm({
         categories={categories}
         error={formError}
         allowedTypes={["expense", "income"]}
+        withTags
       >
         <ReceiptField
           transactionId={transaction.id}

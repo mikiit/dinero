@@ -1,5 +1,6 @@
 import { parseCsv, unguardCell } from "@/lib/csv";
 import { toMinor } from "@/lib/money";
+import { parseTags } from "@/lib/tags";
 
 // Pure planning step for CSV import: no I/O, so every rule is unit-testable.
 // Reads exactly the format lib/db/export.ts writes. Nothing is created
@@ -18,11 +19,29 @@ export const TRANSACTION_CSV_HEADERS = [
   "to_amount",
   "merchant",
   "note",
+  "tags",
 ] as const;
 
-/** Files exported before multi-currency have no to_amount column; they are
- * still accepted (every row in them is single-currency). */
-const LEGACY_HEADERS = TRANSACTION_CSV_HEADERS.filter((h) => h !== "to_amount");
+/** Columns added after the first export format. Older files without them
+ * are still accepted: no to_amount means every row is single-currency, no
+ * tags means no tags. */
+const OPTIONAL_COLUMNS: readonly string[] = ["to_amount", "tags"];
+
+function acceptedHeaders(): string[] {
+  const out: string[] = [];
+  for (const withToAmount of [true, false]) {
+    for (const withTags of [true, false]) {
+      out.push(
+        TRANSACTION_CSV_HEADERS.filter(
+          (h) =>
+            !OPTIONAL_COLUMNS.includes(h) ||
+            (h === "to_amount" ? withToAmount : withTags),
+        ).join(","),
+      );
+    }
+  }
+  return out;
+}
 
 export const MAX_IMPORT_ROWS = 5000;
 
@@ -48,6 +67,8 @@ export type PlannedTransaction = {
   occurredOn: string;
   merchant: string | null;
   note: string | null;
+  /** Normalized (parseTags); empty when none. */
+  tags: string[];
 };
 
 export type ImportRowError = { line: number; message: string };
@@ -125,13 +146,16 @@ export function planTransactionsImport(
 
   if (rows.length === 0) return fail("The file is empty.");
   const header = rows[0].map((h) => h.trim());
-  const isLegacy = header.join(",") === LEGACY_HEADERS.join(",");
-  if (!isLegacy && header.join(",") !== TRANSACTION_CSV_HEADERS.join(",")) {
+  if (!acceptedHeaders().includes(header.join(","))) {
     return fail(
       `Unexpected columns. Expected: ${TRANSACTION_CSV_HEADERS.join(", ")}.`,
     );
   }
-  const columnCount = isLegacy ? LEGACY_HEADERS.length : TRANSACTION_CSV_HEADERS.length;
+  const columnCount = header.length;
+  const cell = (cells: string[], name: string) => {
+    const i = header.indexOf(name);
+    return i === -1 ? "" : cells[i];
+  };
 
   const dataRows = rows.slice(1);
   if (dataRows.length > MAX_IMPORT_ROWS) {
@@ -170,9 +194,17 @@ export function planTransactionsImport(
     if (cells.length !== columnCount) {
       return error(`Expected ${columnCount} columns, found ${cells.length}.`);
     }
-    const [date, type, accountRaw, toAccountRaw, categoryRaw, amountRaw, currency, ...rest] =
-      cells;
-    const [toAmountRaw, merchantRaw, noteRaw] = isLegacy ? ["", ...rest] : rest;
+    const date = cell(cells, "date");
+    const type = cell(cells, "type");
+    const accountRaw = cell(cells, "account");
+    const toAccountRaw = cell(cells, "to_account");
+    const categoryRaw = cell(cells, "category");
+    const amountRaw = cell(cells, "amount");
+    const currency = cell(cells, "currency");
+    const toAmountRaw = cell(cells, "to_amount");
+    const merchantRaw = cell(cells, "merchant");
+    const noteRaw = cell(cells, "note");
+    const tagsRaw = cell(cells, "tags");
     // Text cells went through csvCell's formula guard on export.
     const accountName = unguardCell(accountRaw);
     const toAccountName = unguardCell(toAccountRaw);
@@ -276,6 +308,7 @@ export function planTransactionsImport(
       occurredOn,
       merchant: merchantRaw === "" ? null : unguardCell(merchantRaw),
       note: noteRaw === "" ? null : unguardCell(noteRaw),
+      tags: parseTags(unguardCell(tagsRaw)),
     };
 
     const key = transactionKey(planned);

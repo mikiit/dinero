@@ -13,6 +13,9 @@ import {
 import type { Account } from "@/lib/db/accounts";
 import type { Category, CategoryKind } from "@/lib/db/categories";
 import { toCurrency } from "@/lib/currency";
+import { useQuery } from "@tanstack/react-query";
+import { listTagsAction } from "@/app/transactions/actions";
+import { parseTags } from "@/lib/tags";
 
 export type TransactionType = "expense" | "income" | "transfer";
 
@@ -52,7 +55,60 @@ export type TransactionFormState = {
   toAmount?: string;
   occurredOn: string;
   note: string;
+  /** What is typed in the tags box ("trip, gift"); normalized on save. */
+  tags?: string;
 };
+
+/** Tags box with one-tap suggestions from tags already in use. */
+function TagsField({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (next: string) => void;
+}) {
+  const known = useQuery({
+    queryKey: ["tags"],
+    queryFn: listTagsAction,
+    staleTime: 10_000,
+  });
+  const chosen = new Set(parseTags(value));
+  const suggestions = (known.data ?? [])
+    .filter((t) => !chosen.has(t.tag))
+    .slice(0, 8);
+
+  function add(tag: string) {
+    const trimmed = value.trim().replace(/[,;]+$/, "");
+    onChange(trimmed === "" ? tag : `${trimmed}, ${tag}`);
+  }
+
+  return (
+    <div className="space-y-1.5">
+      <Label htmlFor="tags">Tags (optional)</Label>
+      <Input
+        id="tags"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder="e.g. trip, gift"
+        autoCapitalize="none"
+      />
+      {suggestions.length > 0 && (
+        <div className="flex flex-wrap gap-1.5" aria-label="Suggested tags">
+          {suggestions.map((t) => (
+            <button
+              key={t.tag}
+              type="button"
+              onClick={() => add(t.tag)}
+              className="rounded-full border px-2.5 py-0.5 text-xs text-muted-foreground hover:text-foreground"
+            >
+              #{t.tag}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export function TransactionFormFields({
   state,
@@ -64,6 +120,7 @@ export function TransactionFormFields({
   allowedTypes = TRANSACTION_TYPES,
   dateLabel = "Date",
   sameCurrencyTransfersOnly = false,
+  withTags = false,
   children,
 }: {
   state: TransactionFormState;
@@ -83,6 +140,9 @@ export function TransactionFormFields({
   /** Recurring rules cannot know the amount that will arrive in another
    * currency, so they only offer destinations in the source's currency. */
   sameCurrencyTransfersOnly?: boolean;
+  /** Show the tags box (not used by recurring rules, whose template has no
+   * tags). */
+  withTags?: boolean;
   /** Extra fields rendered inside the scrolling area, below the note. */
   children?: React.ReactNode;
 }) {
@@ -257,6 +317,13 @@ export function TransactionFormFields({
           placeholder="Optional note"
         />
       </div>
+
+      {withTags && (
+        <TagsField
+          value={state.tags ?? ""}
+          onChange={(tags) => onChange({ tags })}
+        />
+      )}
 
       {children}
 

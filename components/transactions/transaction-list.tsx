@@ -35,6 +35,7 @@ import { useToast } from "@/components/ui/toaster";
 import { useLedger } from "@/components/spaces/ledger-provider";
 import type { TransactionFormState } from "@/components/transactions/transaction-form-fields";
 import { DEFAULT_CURRENCY, sumByCurrency } from "@/lib/currency";
+import { formatTags, parseTags } from "@/lib/tags";
 
 type RowIssue = { message: string; retry: () => void };
 
@@ -347,6 +348,7 @@ function TransactionListResults({
         amount: toMinor(form.amount).toString(),
         occurredOn: form.occurredOn,
         note: form.note.trim() || null,
+        tags: parseTags(form.tags ?? ""),
       },
     }));
     clearIssue(id);
@@ -360,6 +362,7 @@ function TransactionListResults({
         amount: toDecimalString(BigInt(before.amount)),
         occurredOn: before.occurredOn,
         note: before.note ?? "",
+        tags: formatTags(before.tags),
       };
       show({
         message: "Changes saved.",
@@ -474,6 +477,7 @@ function TransactionListResults({
                             {transferAccountLabel(account?.name, t.type, t.toAccountId, accountById)}
                             {transferReceivedLabel(t.type, t.toAmount, t.toAccountId, accountById)}
                             {t.note ? ` · ${t.note}` : ""}
+                            {t.tags.length > 0 ? ` · ${t.tags.map((x) => `#${x}`).join(" ")}` : ""}
                           </span>
                         </span>
                       </button>
@@ -587,9 +591,11 @@ function TransactionListResults({
                             />
                           )}
                         </span>
-                        {t.note && (
+                        {(t.note || t.tags.length > 0) && (
                           <span className="block truncate text-xs text-muted-foreground">
-                            {t.note}
+                            {[t.note, t.tags.map((x) => `#${x}`).join(" ")]
+                              .filter(Boolean)
+                              .join(" · ")}
                           </span>
                         )}
                       </span>

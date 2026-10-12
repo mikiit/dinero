@@ -44,6 +44,7 @@ function emptyForm(accounts: Account[]): TransactionFormState {
     amount: "",
     occurredOn: todayIso(),
     note: "",
+    tags: "",
   };
 }
 
@@ -88,6 +89,7 @@ export function AddTransactionSheet({
       queryClient.invalidateQueries({ queryKey: ["transactions"] });
       // What you usually enter just changed.
       queryClient.invalidateQueries({ queryKey: ["quick-templates"] });
+      queryClient.invalidateQueries({ queryKey: ["tags"] });
     },
   });
   const templates = useQuery({
@@ -237,6 +239,7 @@ export function AddTransactionSheet({
           accounts={accounts}
           categories={categories}
           autoFocusAmount
+          withTags
           error={formError}
         >
           <ReceiptField

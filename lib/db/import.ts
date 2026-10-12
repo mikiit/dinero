@@ -88,6 +88,7 @@ export async function insertPlannedTransactions(
       occurred_on: r.occurredOn,
       merchant: r.merchant,
       note: r.note,
+      tags: r.tags.length > 0 ? r.tags : null,
     })),
   );
   if (error) throw error;

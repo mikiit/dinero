@@ -4,6 +4,7 @@ import type { AnyTransactionType, TransactionFilters } from "@/lib/db/transactio
 import { TransactionList } from "@/components/transactions/transaction-list";
 import { getContext } from "@/lib/context";
 import { redirect } from "next/navigation";
+import { parseTags } from "@/lib/tags";
 
 const TYPES: readonly AnyTransactionType[] = [
   "expense",
@@ -33,6 +34,10 @@ function filtersFromSearchParams(
   if (from && DATE.test(from)) filters.dateFrom = from;
   const to = one("to");
   if (to && DATE.test(to)) filters.dateTo = to;
+
+  const tag = one("tag");
+  const parsedTag = tag ? parseTags(tag)[0] : undefined;
+  if (parsedTag) filters.tag = parsedTag;
 
   const category = one("category");
   if (category && categories.some((c) => c.id === category)) {

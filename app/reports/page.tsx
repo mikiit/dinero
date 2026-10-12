@@ -17,6 +17,8 @@ import {
 } from "@/components/reports/budget-progress";
 import { getContext } from "@/lib/context";
 import { redirect } from "next/navigation";
+import { getSpendByTag } from "@/lib/db/tags";
+import { TagSpendList } from "@/components/reports/tag-spend";
 
 export default async function ReportsPage({
   searchParams,
@@ -46,12 +48,13 @@ export default async function ReportsPage({
   const currency = isCurrency(c) ? c : currencies[0];
 
   const previousMonth = shiftMonth(month, -1);
-  const [series, spend, previousSpend, categories, budgets] = await Promise.all([
+  const [series, spend, previousSpend, categories, budgets, tagSpend] = await Promise.all([
     getMonthlySeries(supabase, scope, month, currency),
     getSpendBreakdown(supabase, scope, month, currency),
     getSpendBreakdown(supabase, scope, previousMonth, currency),
     listCategories(supabase, scope),
     listBudgets(supabase, scope, month, currency),
+    getSpendByTag(supabase, scope, month, currency),
   ]);
   const selected = series[series.length - 1];
 
@@ -66,6 +69,10 @@ export default async function ReportsPage({
     else params.set("uncategorized", "1");
     return `/transactions?${params.toString()}`;
   });
+
+  const tagHrefs = tagSpend.map((t) =>
+    `/transactions?${new URLSearchParams({ type: "expense", from: month, to: monthEnd, tag: t.tag }).toString()}`,
+  );
 
   const budgetCtx = {
     monthStartIso: month,
@@ -152,6 +159,13 @@ export default async function ReportsPage({
           <CashFlowChart series={series} selectedMonthIso={month} currency={currency} />
         </section>
       </div>
+
+      {tagSpend.length > 0 && (
+        <section className="space-y-3">
+          <h2 className="text-sm font-medium text-muted-foreground">Spending by tag</h2>
+          <TagSpendList items={tagSpend} currency={currency} hrefs={tagHrefs} />
+        </section>
+      )}
     </main>
   );
 }

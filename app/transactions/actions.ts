@@ -20,6 +20,8 @@ import { listQuickTemplates } from "@/lib/db/quick-templates";
 import type { QuickTemplate } from "@/lib/quick-templates";
 import { receiptOwnerKey } from "@/lib/scope";
 import { getContext, requireWriteContext } from "@/lib/context";
+import { listTags } from "@/lib/db/tags";
+import { parseTags, type TagCount } from "@/lib/tags";
 
 export type CreateTransactionActionInput = {
   /** Client-generated id; required whenever `receiptPath` is set, because
@@ -40,6 +42,8 @@ export type CreateTransactionActionInput = {
   toAmount?: string;
   occurredOn: string;
   note?: string;
+  /** What was typed in the tags box; normalized here. */
+  tags?: string;
 };
 
 export type UpdateTransactionActionInput = CreateTransactionActionInput & {
@@ -153,6 +157,7 @@ export async function createTransactionAction(
       toAmount: validated.toAmount,
       occurredOn: input.occurredOn,
       note: input.note?.trim() || null,
+      tags: parseTags(input.tags ?? ""),
     });
   } catch (err) {
     return {
@@ -186,6 +191,7 @@ export async function updateTransactionAction(
       toAmount: validated.toAmount,
       occurredOn: input.occurredOn,
       note: input.note?.trim() || null,
+      tags: parseTags(input.tags ?? ""),
     });
   } catch (err) {
     return {
@@ -238,6 +244,19 @@ export async function restoreTransactionAction(
   revalidatePath("/accounts");
   revalidatePath("/");
   return {};
+}
+
+/** Tags in use, for the tag box's suggestions and the list's filter. */
+export async function listTagsAction(): Promise<TagCount[]> {
+  const ctx = await getContext();
+  if (!ctx) return [];
+  try {
+    return await listTags(ctx.supabase, ctx.scope);
+  } catch (err) {
+    // Suggestions are a convenience; never block the form on them.
+    console.error("listing tags failed", err);
+    return [];
+  }
 }
 
 /** Quick-add suggestions for the active ledger (see lib/quick-templates.ts). */

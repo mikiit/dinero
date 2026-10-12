@@ -94,5 +94,6 @@ export async function buildTransactionsCsv(
     },
     { header: "merchant", value: (r) => r.merchant ?? "" },
     { header: "note", value: (r) => r.note ?? "" },
+    { header: "tags", value: (r) => (r.tags ?? []).join(" ") },
   ]);
 }

@@ -106,7 +106,7 @@ describe.skipIf(!hasCredentials)("transactions CSV export (live)", () => {
     const lines = csv.replace("﻿", "").trimEnd().split("\r\n");
 
     expect(lines[0]).toBe(
-      "date,type,account,to_account,category,amount,currency,to_amount,merchant,note",
+      "date,type,account,to_account,category,amount,currency,to_amount,merchant,note,tags",
     );
     // header + 1001 bulk + formula row + archived-account row; not the deleted one
     expect(lines).toHaveLength(1 + BULK + 2);

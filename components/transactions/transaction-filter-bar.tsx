@@ -15,6 +15,8 @@ import type { Account } from "@/lib/db/accounts";
 import type { Category } from "@/lib/db/categories";
 import type { AnyTransactionType, TransactionFilters } from "@/lib/db/transactions";
 import { buildCategoryOptions } from "@/components/transactions/transaction-form-fields";
+import { useQuery } from "@tanstack/react-query";
+import { listTagsAction } from "@/app/transactions/actions";
 
 const TYPE_OPTIONS: { value: AnyTransactionType | "all"; label: string }[] = [
   { value: "all", label: "All types" },
@@ -36,6 +38,15 @@ export function TransactionFilterBar({
   onChange: (next: TransactionFilters) => void;
 }) {
   const [searchInput, setSearchInput] = useState(filters.search ?? "");
+  const tagsQuery = useQuery({
+    queryKey: ["tags"],
+    queryFn: listTagsAction,
+    staleTime: 10_000,
+  });
+  const tags = tagsQuery.data ?? [];
+  // Keep the applied tag selectable even if the list has not loaded (or the
+  // tag has since lost its last transaction).
+  const showTagFilter = tags.length > 0 || Boolean(filters.tag);
 
   // On a phone the five filter controls would push the list a full screen
   // down, so they sit behind a button. Already-applied filters (e.g. from a
@@ -44,6 +55,7 @@ export function TransactionFilterBar({
     filters.accountId,
     filters.categoryId ?? (filters.uncategorized ? "none" : undefined),
     filters.type,
+    filters.tag,
     filters.dateFrom,
     filters.dateTo,
   ].filter(Boolean).length;
@@ -196,7 +208,36 @@ export function TransactionFilterBar({
           </SelectContent>
         </Select>
 
-        <div className="lg:hidden" />
+        {showTagFilter ? (
+          <Select
+            value={filters.tag ?? "all"}
+            onValueChange={(value) =>
+              onChange({
+                ...filters,
+                tag: value === "all" ? undefined : (value as string),
+              })
+            }
+          >
+            <SelectTrigger className="w-full lg:w-36" aria-label="Tag">
+              <SelectValue>
+                {(value: string) => (value === "all" ? "All tags" : `#${value}`)}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All tags</SelectItem>
+              {filters.tag && !tags.some((t) => t.tag === filters.tag) && (
+                <SelectItem value={filters.tag}>#{filters.tag}</SelectItem>
+              )}
+              {tags.map((t) => (
+                <SelectItem key={t.tag} value={t.tag}>
+                  #{t.tag} ({t.count})
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        ) : (
+          <div className="lg:hidden" />
+        )}
       </div>
 
       {/* minmax(0, 1fr) + min-w-0: a native date input has a minimum width

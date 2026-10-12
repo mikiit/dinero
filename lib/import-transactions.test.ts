@@ -10,7 +10,7 @@ import {
 
 // The pre-multi-currency header (no to_amount): still accepted, and keeps
 // these single-currency fixtures short. The full header is used below.
-const HEADER = TRANSACTION_CSV_HEADERS.filter((h) => h !== "to_amount").join(",");
+const HEADER = TRANSACTION_CSV_HEADERS.filter((h) => h !== "to_amount" && h !== "tags").join(",");
 const FULL_HEADER = TRANSACTION_CSV_HEADERS.join(",");
 
 const accounts: ImportAccount[] = [
@@ -53,6 +53,7 @@ describe("planTransactionsImport", () => {
         occurredOn: "2026-01-15",
         merchant: "Maxi",
         note: "milk",
+        tags: [],
       },
     ]);
   });
@@ -170,7 +171,7 @@ describe("planTransactionsImport", () => {
     }
 
     it("takes the received amount from to_amount", () => {
-      const p = planFull(["2026-01-15,transfer,Euro,Wallet,,100.00,EUR,11700.50,,"]);
+      const p = planFull(["2026-01-15,transfer,Euro,Wallet,,100.00,EUR,11700.50,,,"]);
       expect(p.errors).toEqual([]);
       expect(p.toInsert[0]).toMatchObject({
         type: "transfer",
@@ -181,15 +182,15 @@ describe("planTransactionsImport", () => {
     });
 
     it("requires to_amount when the currencies differ", () => {
-      const p = planFull(["2026-01-15,transfer,Euro,Wallet,,100.00,EUR,,,"]);
+      const p = planFull(["2026-01-15,transfer,Euro,Wallet,,100.00,EUR,,,,"]);
       expect(p.toInsert).toEqual([]);
       expect(p.errors[0].message).toMatch(/needs a positive to_amount/);
     });
 
     it("rejects to_amount on same-currency transfers and on other types", () => {
       const p = planFull([
-        "2026-01-15,transfer,Wallet,Card,,50.00,RSD,50.00,,",
-        "2026-01-15,expense,Wallet,,,5.00,RSD,5.00,,",
+        "2026-01-15,transfer,Wallet,Card,,50.00,RSD,50.00,,,",
+        "2026-01-15,expense,Wallet,,,5.00,RSD,5.00,,,",
       ]);
       expect(p.toInsert).toEqual([]);
       expect(p.errors.map((e) => e.line)).toEqual([2, 3]);
@@ -207,5 +208,49 @@ describe("planTransactionsImport", () => {
     expect(p.errors).toEqual([]);
     expect(p.toInsert[0].merchant).toBe("Maxi, Beograd");
     expect(p.toInsert[0].note).toBe("a\nb");
+  });
+});
+
+describe("tags column", () => {
+  const FULL = TRANSACTION_CSV_HEADERS.join(",");
+  const run = (header: string, line: string) =>
+    planTransactionsImport(`${header}\r\n${line}`, accounts, categories, new Map());
+
+  it("reads and normalizes tags", () => {
+    const p = run(FULL, '2026-01-15,expense,Wallet,,,5.00,RSD,,,,"#Trip  summer,Gift"');
+    expect(p.errors).toEqual([]);
+    expect(p.toInsert[0].tags).toEqual(["trip", "summer", "gift"]);
+  });
+
+  it("accepts a header without tags, or without to_amount, or without both", () => {
+    const noTags = TRANSACTION_CSV_HEADERS.filter((h) => h !== "tags").join(",");
+    const noToAmount = TRANSACTION_CSV_HEADERS.filter((h) => h !== "to_amount").join(",");
+    const neither = TRANSACTION_CSV_HEADERS.filter(
+      (h) => h !== "tags" && h !== "to_amount",
+    ).join(",");
+
+    expect(run(noTags, "2026-01-15,expense,Wallet,,,5.00,RSD,,,").toInsert[0].tags).toEqual([]);
+    expect(run(noToAmount, "2026-01-15,expense,Wallet,,,5.00,RSD,,,x").toInsert[0].tags).toEqual(["x"]);
+    expect(run(neither, "2026-01-15,expense,Wallet,,,5.00,RSD,,").errors).toEqual([]);
+  });
+
+  it("does not count tags toward duplicate detection", () => {
+    const key = transactionKey({
+      type: "expense",
+      accountId: "a-wallet",
+      toAccountId: null,
+      categoryId: null,
+      amount: 500n,
+      occurredOn: "2026-01-15",
+      merchant: null,
+      note: null,
+    });
+    const p = planTransactionsImport(
+      `${FULL}\r\n2026-01-15,expense,Wallet,,,5.00,RSD,,,,trip`,
+      accounts,
+      categories,
+      new Map([[key, 1]]),
+    );
+    expect(p.duplicates).toBe(1);
   });
 });
