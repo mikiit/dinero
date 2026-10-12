@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { ThemeToggle } from "@/components/settings/theme-toggle";
 import { AccountSection } from "@/components/settings/account-section";
 import { ImportSection } from "@/components/settings/import-section";
+import { InstallApp } from "@/components/pwa/install-app";
 
 export default async function SettingsPage() {
   const supabase = await createClient();
@@ -25,6 +26,13 @@ export default async function SettingsPage() {
       <div className="space-y-2">
         <h2 className="text-sm font-medium text-muted-foreground">Theme</h2>
         <ThemeToggle />
+      </div>
+
+      <div className="space-y-2">
+        <h2 className="text-sm font-medium text-muted-foreground">
+          Install on your phone
+        </h2>
+        <InstallApp isAnonymous={user?.is_anonymous ?? true} />
       </div>
 
       <div className="space-y-2">

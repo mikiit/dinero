@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/server";
 import { listAccounts } from "@/lib/db/accounts";
 import { listCategories } from "@/lib/db/categories";
 import { ensureRecurringPosted } from "@/lib/recurring-sync";
+import { RegisterServiceWorker } from "@/components/pwa/register-service-worker";
 import { themeInitScript } from "@/lib/theme";
 import "./globals.css";
 
@@ -27,6 +28,13 @@ const jetbrainsMono = JetBrains_Mono({
 export const metadata: Metadata = {
   title: "Dinero",
   description: "Personal expense tracker",
+  // iOS ignores most of the manifest: these are what make "Add to Home
+  // Screen" open full-screen with the right name and icon.
+  appleWebApp: { capable: true, title: "Dinero", statusBarStyle: "default" },
+  icons: {
+    icon: [{ url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" }],
+    apple: [{ url: "/icons/apple-touch-icon.png", sizes: "180x180" }],
+  },
 };
 
 // viewport-fit=cover is required for env(safe-area-inset-bottom) in the
@@ -36,6 +44,12 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
+  // Browser chrome / status bar follows the app's own light and dark
+  // backgrounds (a manifest can only hold one color).
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
+    { media: "(prefers-color-scheme: dark)", color: "#0a0a0a" },
+  ],
 };
 
 export default async function RootLayout({ children }: LayoutProps<"/">) {
@@ -80,6 +94,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
           </div>
           <BottomTabBar accounts={accounts} categories={categories} />
         </Providers>
+        <RegisterServiceWorker />
       </body>
     </html>
   );

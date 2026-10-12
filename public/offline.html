@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="color-scheme" content="light dark" />
+    <title>Offline - Dinero</title>
+    <style>
+      :root {
+        --bg: #ffffff;
+        --fg: #171717;
+        --muted: #6b6b6b;
+        --accent: #c47c00;
+        --accent-fg: #1d1409;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #0a0a0a;
+          --fg: #f5f5f5;
+          --muted: #a3a3a3;
+          --accent: #e0a52e;
+        }
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        padding: 24px;
+        background: var(--bg);
+        color: var(--fg);
+        font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+        text-align: center;
+      }
+      main { max-width: 22rem; }
+      h1 { font-size: 1.25rem; margin: 0 0 0.5rem; }
+      p { margin: 0 0 1.5rem; color: var(--muted); line-height: 1.5; }
+      button {
+        font: inherit;
+        font-weight: 600;
+        padding: 0.65rem 1.5rem;
+        border: 0;
+        border-radius: 0.6rem;
+        background: var(--accent);
+        color: var(--accent-fg);
+        cursor: pointer;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>You're offline</h1>
+      <p>
+        Dinero needs a connection to show your balances, so nothing is shown
+        rather than numbers that might be out of date. Reconnect and try again.
+      </p>
+      <button type="button" onclick="location.reload()">Try again</button>
+    </main>
+  </body>
+</html>
