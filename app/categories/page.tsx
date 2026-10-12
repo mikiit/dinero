@@ -2,19 +2,12 @@ import { listCategories } from "@/lib/db/categories";
 import { CategoryList } from "@/components/categories/category-list";
 import { CategoryDialog } from "@/components/categories/category-dialog";
 import { getContext } from "@/lib/context";
+import { redirect } from "next/navigation";
 
 export default async function CategoriesPage() {
   const ctx = await getContext();
 
-  if (!ctx) {
-    return (
-      <main className="mx-auto max-w-md p-4">
-        <p className="text-sm text-muted-foreground">
-          Setting up your session — refresh in a moment.
-        </p>
-      </main>
-    );
-  }
+  if (!ctx) redirect("/login");
 
   const { supabase, scope } = ctx;
 

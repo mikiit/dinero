@@ -3,6 +3,7 @@ import { listCategories, type Category } from "@/lib/db/categories";
 import type { AnyTransactionType, TransactionFilters } from "@/lib/db/transactions";
 import { TransactionList } from "@/components/transactions/transaction-list";
 import { getContext } from "@/lib/context";
+import { redirect } from "next/navigation";
 
 const TYPES: readonly AnyTransactionType[] = [
   "expense",
@@ -50,15 +51,7 @@ export default async function TransactionsPage({
   const params = await searchParams;
   const ctx = await getContext();
 
-  if (!ctx) {
-    return (
-      <main className="mx-auto max-w-md p-4">
-        <p className="text-sm text-muted-foreground">
-          Setting up your session — refresh in a moment.
-        </p>
-      </main>
-    );
-  }
+  if (!ctx) redirect("/login");
 
   const { supabase, scope } = ctx;
 

@@ -13,19 +13,12 @@ import {
   type RuleItem,
 } from "@/components/recurring/recurring-manager";
 import { getContext } from "@/lib/context";
+import { redirect } from "next/navigation";
 
 export default async function RecurringPage() {
   const ctx = await getContext();
 
-  if (!ctx) {
-    return (
-      <main className="mx-auto max-w-md p-4">
-        <p className="text-sm text-muted-foreground">
-          Setting up your session — refresh in a moment.
-        </p>
-      </main>
-    );
-  }
+  if (!ctx) redirect("/login");
 
   const { supabase, scope } = ctx;
 

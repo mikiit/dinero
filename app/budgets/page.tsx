@@ -6,6 +6,7 @@ import { parseMonthParam } from "@/lib/reports";
 import { MonthNav } from "@/components/reports/month-nav";
 import { BudgetEditor, type BudgetRowData } from "@/components/budgets/budget-editor";
 import { getContext } from "@/lib/context";
+import { redirect } from "next/navigation";
 
 export default async function BudgetsPage({
   searchParams,
@@ -16,15 +17,7 @@ export default async function BudgetsPage({
 
   const ctx = await getContext();
 
-  if (!ctx) {
-    return (
-      <main className="mx-auto max-w-md p-4">
-        <p className="text-sm text-muted-foreground">
-          Setting up your session — refresh in a moment.
-        </p>
-      </main>
-    );
-  }
+  if (!ctx) redirect("/login");
 
   const { supabase, scope } = ctx;
 

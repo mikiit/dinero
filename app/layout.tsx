@@ -83,25 +83,31 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
       </head>
       <body className="min-h-full flex flex-col">
         <Providers>
-          <LedgerProvider
-            value={{
-              activeSpaceId: ctx?.scope.spaceId ?? null,
-              role: ctx?.role ?? null,
-              canWrite: ctx?.canWrite ?? true,
-              spaces: ctx?.spaces ?? [],
-            }}
-          >
-          <Sidebar accounts={accounts} categories={categories} />
-          {/* 4rem matches BottomTabBar's own min-h-16, so content clears
-              the fixed bar exactly rather than by a guessed margin. lg:
-              swaps that for left clearance under the persistent sidebar,
-              which replaces the tab bar entirely at that width. */}
-          <div className="flex-1 pb-[calc(4rem+env(safe-area-inset-bottom))] lg:pb-0 lg:pl-64">
-            <LedgerBar />
-            {children}
-          </div>
-          <BottomTabBar accounts={accounts} categories={categories} />
-          </LedgerProvider>
+          {ctx ? (
+            <LedgerProvider
+              value={{
+                activeSpaceId: ctx.scope.spaceId,
+                role: ctx.role,
+                canWrite: ctx.canWrite,
+                spaces: ctx.spaces,
+              }}
+            >
+              <Sidebar accounts={accounts} categories={categories} />
+              {/* 4rem matches BottomTabBar's own min-h-16, so content clears
+                  the fixed bar exactly rather than by a guessed margin. lg:
+                  swaps that for left clearance under the persistent sidebar,
+                  which replaces the tab bar entirely at that width. */}
+              <div className="flex-1 pb-[calc(4rem+env(safe-area-inset-bottom))] lg:pb-0 lg:pl-64">
+                <LedgerBar />
+                {children}
+              </div>
+              <BottomTabBar accounts={accounts} categories={categories} />
+            </LedgerProvider>
+          ) : (
+            // Nobody is signed in (this is the login screen): no navigation,
+            // no accounts, no ledger - nothing of the app to show or reach.
+            <div className="flex flex-1 flex-col">{children}</div>
+          )}
         </Providers>
         <RegisterServiceWorker />
       </body>

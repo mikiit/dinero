@@ -9,19 +9,12 @@ import { DueRecurring, type DueRow } from "@/components/home/due-recurring";
 import { MobileHome } from "@/components/home/mobile-home";
 import { DesktopHome } from "@/components/home/desktop-home";
 import { getContext } from "@/lib/context";
+import { redirect } from "next/navigation";
 
 export default async function HomePage() {
   const ctx = await getContext();
 
-  if (!ctx) {
-    return (
-      <main className="mx-auto max-w-md p-4">
-        <p className="text-sm text-muted-foreground">
-          Setting up your session — refresh in a moment.
-        </p>
-      </main>
-    );
-  }
+  if (!ctx) redirect("/login");
 
   const { supabase, scope } = ctx;
 

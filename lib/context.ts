@@ -60,15 +60,17 @@ async function loadSpaces(
  * member - a stale or forged cookie falls back to the personal ledger
  * rather than ever naming a space the user can't see.
  *
- * Returns null when there is no session yet (proxy.ts creates one on the
- * next request).
+ * Returns null when nobody is signed in; proxy.ts sends such visitors to
+ * /login before any page renders, so pages that get null just redirect.
  */
 export const getContext = cache(async (): Promise<AppContext | null> => {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return null;
+  // An anonymous (temporary) session is not a login: the app is for
+  // signed-in people only (see lib/supabase/access.ts).
+  if (!user || user.is_anonymous) return null;
 
   let spaces: SpaceSummary[] = [];
   try {

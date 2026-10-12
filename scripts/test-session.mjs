@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Dev tooling for browser-driven verification: creates a disposable
-// anonymous test user (never the real session already sitting in your
+// (email, pre-confirmed) test user (never the real session already sitting in your
 // browser's cookies) so clicking around in Chrome to verify a feature can
 // never touch your actual accounts/categories/transactions.
 //
@@ -67,11 +67,25 @@ function isoDaysAgo(n) {
 }
 
 async function setup(seedTransactions) {
-  const client = createClient(url, anonKey);
+  // The app only admits signed-in people (anonymous sessions are not logins),
+  // so the disposable user is a real email user: created and pre-confirmed
+  // with the admin API, then signed in with its password like anyone else.
+  const admin = createClient(url, secretKey);
+  const email = `ts-${Date.now()}-${Math.random().toString(36).slice(2, 8)}@example.com`;
+  const password = `ts-${Math.random().toString(36).slice(2)}-Aa1`;
+  const created = await admin.auth.admin.createUser({
+    email,
+    password,
+    email_confirm: true,
+  });
+  if (created.error || !created.data.user) {
+    throw created.error ?? new Error("createUser returned no user");
+  }
 
-  const { data, error } = await client.auth.signInAnonymously();
+  const client = createClient(url, anonKey);
+  const { data, error } = await client.auth.signInWithPassword({ email, password });
   if (error || !data.session || !data.user) {
-    throw error ?? new Error("signInAnonymously returned no session");
+    throw error ?? new Error("signInWithPassword returned no session");
   }
   const userId = data.user.id;
 

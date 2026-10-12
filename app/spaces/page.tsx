@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { getContext } from "@/lib/context";
 import {
   SpacesManager,
@@ -6,38 +5,13 @@ import {
   type MemberItem,
   type SpaceDetail,
 } from "@/components/spaces/spaces-manager";
-import { buttonVariants } from "@/components/ui/button";
 import type { SpaceRole } from "@/lib/scope";
+import { redirect } from "next/navigation";
 
 export default async function SpacesPage() {
   const ctx = await getContext();
 
-  if (!ctx) {
-    return (
-      <main className="mx-auto max-w-md p-4">
-        <p className="text-sm text-muted-foreground">
-          Setting up your session — refresh in a moment.
-        </p>
-      </main>
-    );
-  }
-
-  // A shared ledger tied to a throwaway browser session would be lost with
-  // it; the database requires a real account, so say so up front.
-  if (ctx.user.is_anonymous) {
-    return (
-      <main className="mx-auto max-w-md space-y-4 p-4 lg:max-w-xl lg:p-8">
-        <h1 className="font-heading text-xl font-medium">Shared spaces</h1>
-        <p className="text-sm text-muted-foreground">
-          Shared spaces need a real account, so they aren&apos;t lost with this
-          browser and the people you share with can rely on them.
-        </p>
-        <Link href="/login?next=/spaces" className={buttonVariants({ size: "sm" })}>
-          Create account or sign in
-        </Link>
-      </main>
-    );
-  }
+  if (!ctx) redirect("/login");
 
   const now = new Date().toISOString();
   const spaces: SpaceDetail[] = await Promise.all(
