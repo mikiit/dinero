@@ -18,6 +18,70 @@ export function csvCell(value: string, opts: { text?: boolean } = {}): string {
     : guarded;
 }
 
+/** Reverses csvCell's formula guard for text cells: a leading apostrophe
+ * directly before a trigger character was added by us on export. */
+export function unguardCell(value: string): string {
+  return value.startsWith("'") && FORMULA_TRIGGERS.test(value.slice(1))
+    ? value.slice(1)
+    : value;
+}
+
+/**
+ * RFC 4180 parser: quoted fields, doubled quotes, commas and newlines inside
+ * quotes, CRLF or LF, optional UTF-8 BOM. Blank lines are skipped. Throws on
+ * an unterminated quote rather than guessing where the field ended.
+ */
+export function parseCsv(input: string): string[][] {
+  const text = input.charCodeAt(0) === 0xfeff ? input.slice(1) : input;
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let field = "";
+  let inQuotes = false;
+  let wasQuoted = false;
+
+  const endField = () => {
+    row.push(field);
+    field = "";
+    wasQuoted = false;
+  };
+  const endRow = () => {
+    endField();
+    if (!(row.length === 1 && row[0] === "")) rows.push(row);
+    row = [];
+  };
+
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (inQuotes) {
+      if (ch === '"') {
+        if (text[i + 1] === '"') {
+          field += '"';
+          i++;
+        } else {
+          inQuotes = false;
+        }
+      } else {
+        field += ch;
+      }
+    } else if (ch === '"' && field === "" && !wasQuoted) {
+      inQuotes = true;
+      wasQuoted = true;
+    } else if (ch === ",") {
+      endField();
+    } else if (ch === "\r") {
+      if (text[i + 1] === "\n") i++;
+      endRow();
+    } else if (ch === "\n") {
+      endRow();
+    } else {
+      field += ch;
+    }
+  }
+  if (inQuotes) throw new Error("Unterminated quoted field in CSV.");
+  if (field !== "" || row.length > 0) endRow();
+  return rows;
+}
+
 export type CsvColumn<T> = {
   header: string;
   value: (row: T) => string;

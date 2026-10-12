@@ -2,6 +2,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { ThemeToggle } from "@/components/settings/theme-toggle";
 import { AccountSection } from "@/components/settings/account-section";
+import { ImportSection } from "@/components/settings/import-section";
 
 export default async function SettingsPage() {
   const supabase = await createClient();
@@ -56,10 +57,11 @@ export default async function SettingsPage() {
             </a>
           </li>
         </ul>
+        <ImportSection />
       </div>
 
       <p className="text-sm text-muted-foreground">
-        Base currency and CSV import are coming in a later phase.
+        Base currency is coming in a later phase.
       </p>
     </main>
   );

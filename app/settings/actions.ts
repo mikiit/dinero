@@ -2,6 +2,9 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { signOut } from "@/lib/auth/sign-out";
+import { revalidatePath } from "next/cache";
+import { insertPlannedTransactions, planImportForUser } from "@/lib/db/import";
+import type { ImportRowError } from "@/lib/import-transactions";
 
 export type SignOutActionResult = { error?: string };
 
@@ -24,4 +27,74 @@ export async function signOutAction(): Promise<SignOutActionResult> {
   }
 
   return {};
+}
+
+export type ImportActionState =
+  | { status: "idle" }
+  | { status: "error"; error: string }
+  | {
+      status: "preview";
+      total: number;
+      toInsert: number;
+      duplicates: number;
+      errors: ImportRowError[];
+    }
+  | { status: "done"; inserted: number; duplicates: number; skipped: number };
+
+// Next.js caps a server-action body at 1 MB by default; stay under it so the
+// user sees this message rather than a generic framework error.
+const MAX_IMPORT_BYTES = 900 * 1024;
+
+/**
+ * Two-step CSV import behind one action: `mode=preview` plans the file and
+ * reports counts/errors without writing; `mode=import` re-plans the same
+ * file from scratch on the server and writes only what that fresh plan
+ * says. The client never sends a plan back, so what is previewed and what
+ * is written can't drift apart (or be tampered with).
+ */
+export async function importTransactionsAction(
+  _prev: ImportActionState,
+  formData: FormData,
+): Promise<ImportActionState> {
+  const file = formData.get("file");
+  if (!(file instanceof File) || file.size === 0) {
+    return { status: "error", error: "Choose a CSV file first." };
+  }
+  if (file.size > MAX_IMPORT_BYTES) {
+    return { status: "error", error: "File is too large (limit 900 KB)." };
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { status: "error", error: "Not signed in." };
+
+  try {
+    const plan = await planImportForUser(supabase, user.id, await file.text());
+
+    if (formData.get("mode") !== "import") {
+      return {
+        status: "preview",
+        total: plan.total,
+        toInsert: plan.toInsert.length,
+        duplicates: plan.duplicates,
+        errors: plan.errors,
+      };
+    }
+
+    await insertPlannedTransactions(supabase, user.id, plan.toInsert);
+    revalidatePath("/", "layout");
+    return {
+      status: "done",
+      inserted: plan.toInsert.length,
+      duplicates: plan.duplicates,
+      skipped: plan.errors.length,
+    };
+  } catch (err) {
+    return {
+      status: "error",
+      error: err instanceof Error ? err.message : "Import failed.",
+    };
+  }
 }

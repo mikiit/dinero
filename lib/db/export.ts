@@ -10,6 +10,33 @@ const PAGE_SIZE = 1000;
 type TransactionRow = Database["public"]["Tables"]["transactions"]["Row"];
 
 /**
+ * Every non-deleted transaction row for a user, oldest first, paged past
+ * PostgREST's 1000-row cap. Shared by the CSV export and the import's
+ * duplicate check, which both need the complete ledger, not a page of it.
+ */
+export async function fetchAllTransactionRows(
+  supabase: SupabaseClient<Database>,
+  userId: string,
+): Promise<TransactionRow[]> {
+  const rows: TransactionRow[] = [];
+  for (let from = 0; ; from += PAGE_SIZE) {
+    const { data, error } = await supabase
+      .from("transactions")
+      .select("*")
+      .eq("user_id", userId)
+      .is("deleted_at", null)
+      .order("occurred_on", { ascending: true })
+      .order("created_at", { ascending: true })
+      .order("id", { ascending: true })
+      .range(from, from + PAGE_SIZE - 1);
+    if (error) throw error;
+    rows.push(...data);
+    if (data.length < PAGE_SIZE) break;
+  }
+  return rows;
+}
+
+/**
  * Builds the full-history transactions CSV for one user. Exports every
  * non-deleted transaction, including ones on archived accounts/categories
  * (names are looked up without the archived filter, so they still resolve).
@@ -34,21 +61,7 @@ export async function buildTransactionsCsv(
   const accountNames = new Map(accountsRes.data.map((a) => [a.id, a.name]));
   const categories = new Map(categoriesRes.data.map((c) => [c.id, c]));
 
-  const rows: TransactionRow[] = [];
-  for (let from = 0; ; from += PAGE_SIZE) {
-    const { data, error } = await supabase
-      .from("transactions")
-      .select("*")
-      .eq("user_id", userId)
-      .is("deleted_at", null)
-      .order("occurred_on", { ascending: true })
-      .order("created_at", { ascending: true })
-      .order("id", { ascending: true })
-      .range(from, from + PAGE_SIZE - 1);
-    if (error) throw error;
-    rows.push(...data);
-    if (data.length < PAGE_SIZE) break;
-  }
+  const rows = await fetchAllTransactionRows(supabase, userId);
 
   return toCsv(rows, [
     { header: "date", value: (r) => r.occurred_on, text: false },
