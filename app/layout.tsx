@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import type { Metadata, Viewport } from "next";
 import { Space_Grotesk, JetBrains_Mono } from "next/font/google";
 import { Providers } from "@/components/providers";
@@ -11,6 +12,7 @@ import { RegisterServiceWorker } from "@/components/pwa/register-service-worker"
 import { LedgerProvider } from "@/components/spaces/ledger-provider";
 import { LedgerBar } from "@/components/spaces/ledger-bar";
 import { ChromeGate } from "@/components/nav/chrome-gate";
+import { NavigationProgress } from "@/components/nav/navigation-progress";
 import { themeInitScript } from "@/lib/theme";
 import "./globals.css";
 
@@ -83,6 +85,11 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
         <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
       </head>
       <body className="min-h-full flex flex-col">
+        {/* useSearchParams needs a Suspense boundary; null fallback: it is
+            only a bar, nothing to show while it mounts. */}
+        <Suspense fallback={null}>
+          <NavigationProgress />
+        </Suspense>
         <Providers>
           {ctx ? (
             <LedgerProvider
