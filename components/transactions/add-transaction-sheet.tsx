@@ -55,9 +55,15 @@ export function AddTransactionSheet({
   trigger?: React.ReactElement;
 }) {
   const [open, setOpen] = useState(false);
-  const [form, setForm] = useState<TransactionFormState>(() =>
+  const [rawForm, setForm] = useState<TransactionFormState>(() =>
     emptyForm(accounts),
   );
+  // The account picked when the form was first built can stop existing in
+  // `accounts` (none existed yet, or the ledger's accounts changed since):
+  // fall back to the first one rather than submitting a stale or empty id.
+  const form: TransactionFormState = accounts.some((a) => a.id === rawForm.accountId)
+    ? rawForm
+    : { ...rawForm, accountId: accounts[0]?.id ?? "" };
   const [formError, setFormError] = useState<string | null>(null);
   // The id is chosen here, not by the database, so a receipt photo can be
   // uploaded under this transaction's own folder before the row exists.
