@@ -25,7 +25,7 @@ export function AccountStrip({ accounts }: { accounts: Account[] }) {
           <Link
             key={account.id}
             href="/accounts"
-            className="w-64 shrink-0 rounded-lg border p-3"
+            className="w-44 shrink-0 rounded-lg border p-3 sm:w-64"
           >
             <p className="truncate text-sm font-medium">{account.name}</p>
 

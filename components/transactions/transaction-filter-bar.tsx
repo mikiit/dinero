@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { ChevronDownIcon, SlidersHorizontalIcon } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -35,6 +37,18 @@ export function TransactionFilterBar({
 }) {
   const [searchInput, setSearchInput] = useState(filters.search ?? "");
 
+  // On a phone the five filter controls would push the list a full screen
+  // down, so they sit behind a button. Already-applied filters (e.g. from a
+  // Reports drill-down) start open, so they are never hidden from view.
+  const activeCount = [
+    filters.accountId,
+    filters.categoryId ?? (filters.uncategorized ? "none" : undefined),
+    filters.type,
+    filters.dateFrom,
+    filters.dateTo,
+  ].filter(Boolean).length;
+  const [open, setOpen] = useState(activeCount > 0);
+
   // Debounced so typing doesn't fire a fetch per keystroke.
   useEffect(() => {
     const handle = setTimeout(() => {
@@ -64,6 +78,29 @@ export function TransactionFilterBar({
         className="lg:w-56"
       />
 
+      <button
+        type="button"
+        aria-expanded={open}
+        aria-controls="transaction-filters"
+        onClick={() => setOpen((v) => !v)}
+        className="flex h-9 items-center justify-between rounded-lg border px-3 text-sm lg:hidden"
+      >
+        <span className="flex items-center gap-2">
+          <SlidersHorizontalIcon className="size-4" />
+          Filters
+          {activeCount > 0 && (
+            <span className="rounded-full bg-primary px-1.5 text-xs text-primary-foreground">
+              {activeCount}
+            </span>
+          )}
+        </span>
+        <ChevronDownIcon className={cn("size-4 transition-transform", open && "rotate-180")} />
+      </button>
+
+      <div
+        id="transaction-filters"
+        className={cn("flex-col gap-2", open ? "flex" : "hidden", "lg:contents")}
+      >
       <div className="grid grid-cols-2 gap-2 lg:contents">
         <Select
           value={filters.accountId ?? "all"}
@@ -162,25 +199,36 @@ export function TransactionFilterBar({
         <div className="lg:hidden" />
       </div>
 
-      <div className="grid grid-cols-2 gap-2 lg:contents">
-        <Input
-          type="date"
-          aria-label="From date"
-          value={filters.dateFrom ?? ""}
-          onChange={(e) =>
-            onChange({ ...filters, dateFrom: e.target.value || undefined })
-          }
-          className="lg:w-40"
-        />
-        <Input
-          type="date"
-          aria-label="To date"
-          value={filters.dateTo ?? ""}
-          onChange={(e) =>
-            onChange({ ...filters, dateTo: e.target.value || undefined })
-          }
-          className="lg:w-40"
-        />
+      {/* minmax(0, 1fr) + min-w-0: a native date input has a minimum width
+          of its own on iOS and would otherwise push the row off the screen.
+          The visible labels matter there too - an empty date field on iOS is
+          just a blank box. */}
+      <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-2 lg:contents">
+        <label className="min-w-0 space-y-1 lg:space-y-0">
+          <span className="text-xs text-muted-foreground lg:sr-only">From</span>
+          <Input
+            type="date"
+            aria-label="From date"
+            value={filters.dateFrom ?? ""}
+            onChange={(e) =>
+              onChange({ ...filters, dateFrom: e.target.value || undefined })
+            }
+            className="w-full min-w-0 max-w-full appearance-none lg:w-40"
+          />
+        </label>
+        <label className="min-w-0 space-y-1 lg:space-y-0">
+          <span className="text-xs text-muted-foreground lg:sr-only">To</span>
+          <Input
+            type="date"
+            aria-label="To date"
+            value={filters.dateTo ?? ""}
+            onChange={(e) =>
+              onChange({ ...filters, dateTo: e.target.value || undefined })
+            }
+            className="w-full min-w-0 max-w-full appearance-none lg:w-40"
+          />
+        </label>
+      </div>
       </div>
     </div>
   );

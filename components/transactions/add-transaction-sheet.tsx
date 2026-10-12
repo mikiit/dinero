@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { cloneElement, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import {
@@ -71,6 +72,7 @@ export function AddTransactionSheet({
   const [receiptPath, setReceiptPath] = useState<string | null>(null);
 
   const queryClient = useQueryClient();
+  const router = useRouter();
   const mutation = useMutation({
     mutationFn: createTransactionAction,
     // Without this the Transactions list keeps showing its cached pages
@@ -141,11 +143,13 @@ export function AddTransactionSheet({
   }
 
   if (accounts.length === 0) {
-    return (
-      <p className="text-sm text-muted-foreground">
-        Add an account before logging a transaction.
-      </p>
-    );
+    // Nothing to log a transaction against yet. Keep the same button (it
+    // sits in the tab bar / sidebar, and a paragraph of text there wrecks
+    // the layout) but make it take the user to add their first account.
+    return cloneElement(trigger ?? <Button size="lg">Add transaction</Button>, {
+      onClick: () => router.push("/accounts"),
+      title: "Add an account first",
+    } as Record<string, unknown>);
   }
 
   return (
