@@ -8,10 +8,13 @@
 -- Deliberately NOT filtered by deleted_at: if the user deletes an
 -- auto-posted transaction, that occurrence must stay "handled" rather than
 -- being re-created the next time the app opens.
-create unique index transactions_recurring_occurrence_key
+create unique index if not exists transactions_recurring_occurrence_key
   on transactions (recurring_id, occurred_on)
   where recurring_id is not null;
 
+-- Both statements are IF NOT EXISTS so the file is safe to run by hand in
+-- the SQL editor and again later through `supabase db push`.
+--
 -- Soft delete (CLAUDE.md rule 4). Hard-deleting a rule is impossible anyway
 -- once it has posted anything: transactions.recurring_id references it.
-alter table recurring_rules add column deleted_at timestamptz;
+alter table recurring_rules add column if not exists deleted_at timestamptz;

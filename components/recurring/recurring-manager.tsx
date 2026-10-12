@@ -137,7 +137,6 @@ function RuleForm({
         accounts={accounts}
         categories={categories}
         dateLabel={ruleId ? "Next date" : "First date"}
-        error={error}
       >
         <div className="space-y-1.5">
           <Label htmlFor="interval">Repeat every</Label>
@@ -211,6 +210,14 @@ function RuleForm({
           />
         </div>
       </TransactionFormFields>
+
+      {/* Outside the scrolling fields on purpose: with this many fields an
+          error rendered inside them lands below the fold, unseen. */}
+      {error && (
+        <p role="alert" className="px-4 text-sm text-destructive">
+          {error}
+        </p>
+      )}
 
       <SheetFooter className="flex-row">
         <Button
