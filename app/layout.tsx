@@ -10,6 +10,7 @@ import { ensureRecurringPosted } from "@/lib/recurring-sync";
 import { RegisterServiceWorker } from "@/components/pwa/register-service-worker";
 import { LedgerProvider } from "@/components/spaces/ledger-provider";
 import { LedgerBar } from "@/components/spaces/ledger-bar";
+import { ChromeGate } from "@/components/nav/chrome-gate";
 import { themeInitScript } from "@/lib/theme";
 import "./globals.css";
 
@@ -92,16 +93,13 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
                 spaces: ctx.spaces,
               }}
             >
-              <Sidebar accounts={accounts} categories={categories} />
-              {/* 4rem matches BottomTabBar's own min-h-16, so content clears
-                  the fixed bar exactly rather than by a guessed margin. lg:
-                  swaps that for left clearance under the persistent sidebar,
-                  which replaces the tab bar entirely at that width. */}
-              <div className="flex-1 pb-[calc(4rem+env(safe-area-inset-bottom))] lg:pb-0 lg:pl-64">
-                <LedgerBar />
+              <ChromeGate
+                sidebar={<Sidebar accounts={accounts} categories={categories} />}
+                ledgerBar={<LedgerBar />}
+                bottomBar={<BottomTabBar accounts={accounts} categories={categories} />}
+              >
                 {children}
-              </div>
-              <BottomTabBar accounts={accounts} categories={categories} />
+              </ChromeGate>
             </LedgerProvider>
           ) : (
             // Nobody is signed in (this is the login screen): no navigation,

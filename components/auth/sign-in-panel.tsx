@@ -8,11 +8,11 @@ import { Label } from "@/components/ui/label";
 import { createClient } from "@/lib/supabase/client";
 import { signInWithPassword } from "@/lib/auth/sign-in";
 import { signUpWithPassword } from "@/lib/auth/sign-up";
+import { requestPasswordReset } from "@/lib/auth/reset-password";
+import { MIN_PASSWORD_LENGTH, validateNewPassword } from "@/lib/auth/password";
 import { cn } from "@/lib/utils";
 
-type Mode = "signin" | "create";
-
-const MIN_PASSWORD_LENGTH = 8;
+type Mode = "signin" | "create" | "forgot";
 
 /** Supabase's wording is for developers; say what the person should do. */
 function friendly(message: string): string {
@@ -30,9 +30,9 @@ function friendly(message: string): string {
 
 /**
  * The login screen's form for someone who is not signed in: Google, or an
- * email and password (sign in to an existing account, or create one).
- * `next` is where to land afterwards (an invite link, say); it has already
- * been validated as an in-app path by the server.
+ * email and password (sign in to an existing account, or create one), plus
+ * "forgot password". `next` is where to land afterwards (an invite link,
+ * say); it has already been validated as an in-app path by the server.
  */
 export function SignInPanel({ next }: { next?: string | null }) {
   const [mode, setMode] = useState<Mode>("signin");
@@ -43,8 +43,16 @@ export function SignInPanel({ next }: { next?: string | null }) {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
-  const callback = () =>
-    `${window.location.origin}/auth/callback${next ? `?next=${encodeURIComponent(next)}` : ""}`;
+  const callback = (to?: string) => {
+    const target = to ?? next;
+    return `${window.location.origin}/auth/callback${target ? `?next=${encodeURIComponent(target)}` : ""}`;
+  };
+
+  function switchMode(m: Mode) {
+    setMode(m);
+    setError(null);
+    setNotice(null);
+  }
 
   function done() {
     // Full load, not a soft navigation: the app must start fresh as this user.
@@ -71,14 +79,29 @@ export function SignInPanel({ next }: { next?: string | null }) {
     setError(null);
     setNotice(null);
 
-    if (mode === "create" && password.length < MIN_PASSWORD_LENGTH) {
-      setError(`Use a password of at least ${MIN_PASSWORD_LENGTH} characters.`);
-      return;
+    if (mode === "create") {
+      const problem = validateNewPassword(password);
+      if (problem) {
+        setError(problem);
+        return;
+      }
     }
 
     setPending("form");
     const supabase = createClient();
     try {
+      if (mode === "forgot") {
+        // The email link comes back through the callback and on to the form
+        // where the new password is chosen.
+        await requestPasswordReset(supabase, email.trim(), callback("/auth/reset-password"));
+        // The same words whether or not the address has an account: Supabase
+        // answers identically on purpose, and so must we.
+        setNotice(
+          `If there is an account for ${email.trim()}, we sent a link to reset the password. It can take a minute; check spam too.`,
+        );
+        return;
+      }
+
       if (mode === "signin") {
         await signInWithPassword(supabase, email.trim(), password);
         done();
@@ -105,51 +128,61 @@ export function SignInPanel({ next }: { next?: string | null }) {
   }
 
   const busy = pending !== null;
+  const forgot = mode === "forgot";
 
   return (
     <div className="space-y-5">
-      <Button
-        type="button"
-        variant="outline"
-        className="h-11 w-full text-base"
-        onClick={google}
-        disabled={busy}
-      >
-        <svg viewBox="0 0 24 24" className="size-5" aria-hidden>
-          <path fill="#4285F4" d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.5h6.5a5.6 5.6 0 0 1-2.4 3.7v3h3.9c2.3-2.1 3.5-5.2 3.5-8.9Z" />
-          <path fill="#34A853" d="M12 24c3.2 0 6-1.1 8-2.9l-3.9-3c-1.1.7-2.5 1.2-4.1 1.2-3.1 0-5.8-2.1-6.7-5H1.3v3.1A12 12 0 0 0 12 24Z" />
-          <path fill="#FBBC05" d="M5.3 14.3a7.2 7.2 0 0 1 0-4.6V6.6H1.3a12 12 0 0 0 0 10.8l4-3.1Z" />
-          <path fill="#EA4335" d="M12 4.8c1.8 0 3.3.6 4.6 1.8l3.4-3.4A12 12 0 0 0 1.3 6.6l4 3.1c.9-2.8 3.6-4.9 6.7-4.9Z" />
-        </svg>
-        {pending === "google" ? "Redirecting…" : "Continue with Google"}
-      </Button>
+      {!forgot && (
+        <>
+          <Button
+            type="button"
+            variant="outline"
+            className="h-11 w-full text-base"
+            onClick={google}
+            disabled={busy}
+          >
+            <svg viewBox="0 0 24 24" className="size-5" aria-hidden>
+              <path fill="#4285F4" d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.5h6.5a5.6 5.6 0 0 1-2.4 3.7v3h3.9c2.3-2.1 3.5-5.2 3.5-8.9Z" />
+              <path fill="#34A853" d="M12 24c3.2 0 6-1.1 8-2.9l-3.9-3c-1.1.7-2.5 1.2-4.1 1.2-3.1 0-5.8-2.1-6.7-5H1.3v3.1A12 12 0 0 0 12 24Z" />
+              <path fill="#FBBC05" d="M5.3 14.3a7.2 7.2 0 0 1 0-4.6V6.6H1.3a12 12 0 0 0 0 10.8l4-3.1Z" />
+              <path fill="#EA4335" d="M12 4.8c1.8 0 3.3.6 4.6 1.8l3.4-3.4A12 12 0 0 0 1.3 6.6l4 3.1c.9-2.8 3.6-4.9 6.7-4.9Z" />
+            </svg>
+            {pending === "google" ? "Redirecting…" : "Continue with Google"}
+          </Button>
 
-      <div className="flex items-center gap-3 text-xs text-muted-foreground">
-        <span className="h-px flex-1 bg-border" />
-        or with email
-        <span className="h-px flex-1 bg-border" />
-      </div>
+          <div className="flex items-center gap-3 text-xs text-muted-foreground">
+            <span className="h-px flex-1 bg-border" />
+            or with email
+            <span className="h-px flex-1 bg-border" />
+          </div>
+        </>
+      )}
 
       <form onSubmit={submit} className="space-y-4">
-        <div className="flex gap-2" role="tablist" aria-label="Sign in or create an account">
-          {(["signin", "create"] as const).map((m) => (
-            <Button
-              key={m}
-              type="button"
-              role="tab"
-              aria-selected={mode === m}
-              variant={mode === m ? "default" : "outline"}
-              className="h-10 flex-1"
-              onClick={() => {
-                setMode(m);
-                setError(null);
-                setNotice(null);
-              }}
-            >
-              {m === "signin" ? "Sign in" : "Create account"}
-            </Button>
-          ))}
-        </div>
+        {forgot ? (
+          <div className="space-y-1">
+            <h2 className="text-base font-medium">Reset your password</h2>
+            <p className="text-sm text-muted-foreground">
+              Enter your email and we&apos;ll send you a link to choose a new one.
+            </p>
+          </div>
+        ) : (
+          <div className="flex gap-2" role="tablist" aria-label="Sign in or create an account">
+            {(["signin", "create"] as const).map((m) => (
+              <Button
+                key={m}
+                type="button"
+                role="tab"
+                aria-selected={mode === m}
+                variant={mode === m ? "default" : "outline"}
+                className="h-10 flex-1"
+                onClick={() => switchMode(m)}
+              >
+                {m === "signin" ? "Sign in" : "Create account"}
+              </Button>
+            ))}
+          </div>
+        )}
 
         <div className="space-y-1.5">
           <Label htmlFor="auth-email">Email</Label>
@@ -167,42 +200,68 @@ export function SignInPanel({ next }: { next?: string | null }) {
           />
         </div>
 
-        <div className="space-y-1.5">
-          <Label htmlFor="auth-password">Password</Label>
-          <div className="relative">
-            <Input
-              id="auth-password"
-              type={showPassword ? "text" : "password"}
-              autoComplete={mode === "create" ? "new-password" : "current-password"}
-              required
-              minLength={mode === "create" ? MIN_PASSWORD_LENGTH : undefined}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="h-11 pr-11"
-            />
-            <button
-              type="button"
-              onClick={() => setShowPassword((v) => !v)}
-              aria-label={showPassword ? "Hide password" : "Show password"}
-              className="absolute inset-y-0 right-0 flex w-11 items-center justify-center text-muted-foreground"
-            >
-              {showPassword ? <EyeOffIcon className="size-4" /> : <EyeIcon className="size-4" />}
-            </button>
+        {!forgot && (
+          <div className="space-y-1.5">
+            <div className="flex items-baseline justify-between">
+              <Label htmlFor="auth-password">Password</Label>
+              {mode === "signin" && (
+                <button
+                  type="button"
+                  onClick={() => switchMode("forgot")}
+                  className="text-xs text-muted-foreground underline underline-offset-2"
+                >
+                  Forgot password?
+                </button>
+              )}
+            </div>
+            <div className="relative">
+              <Input
+                id="auth-password"
+                type={showPassword ? "text" : "password"}
+                autoComplete={mode === "create" ? "new-password" : "current-password"}
+                required
+                minLength={mode === "create" ? MIN_PASSWORD_LENGTH : undefined}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="h-11 pr-11"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((v) => !v)}
+                aria-label={showPassword ? "Hide password" : "Show password"}
+                className="absolute inset-y-0 right-0 flex w-11 items-center justify-center text-muted-foreground"
+              >
+                {showPassword ? <EyeOffIcon className="size-4" /> : <EyeIcon className="size-4" />}
+              </button>
+            </div>
+            {mode === "create" && (
+              <p className="text-xs text-muted-foreground">
+                At least {MIN_PASSWORD_LENGTH} characters.
+              </p>
+            )}
           </div>
-          {mode === "create" && (
-            <p className="text-xs text-muted-foreground">
-              At least {MIN_PASSWORD_LENGTH} characters.
-            </p>
-          )}
-        </div>
+        )}
 
         <Button type="submit" className="h-11 w-full text-base" disabled={busy}>
           {pending === "form"
             ? "Please wait…"
-            : mode === "signin"
-              ? "Sign in"
-              : "Create account"}
+            : forgot
+              ? "Send reset link"
+              : mode === "signin"
+                ? "Sign in"
+                : "Create account"}
         </Button>
+
+        {forgot && (
+          <Button
+            type="button"
+            variant="ghost"
+            className="w-full"
+            onClick={() => switchMode("signin")}
+          >
+            Back to sign in
+          </Button>
+        )}
 
         <p
           role={error ? "alert" : "status"}
