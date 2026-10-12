@@ -41,6 +41,7 @@ export type Database = {
     Tables: {
       accounts: {
         Row: {
+          space_id: string | null
           archived_at: string | null
           color: string | null
           created_at: string
@@ -58,6 +59,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          space_id?: string | null
           archived_at?: string | null
           color?: string | null
           created_at?: string
@@ -75,6 +77,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          space_id?: string | null
           archived_at?: string | null
           color?: string | null
           created_at?: string
@@ -95,6 +98,7 @@ export type Database = {
       }
       budgets: {
         Row: {
+          space_id: string | null
           amount: number
           category_id: string
           created_at: string
@@ -103,6 +107,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          space_id?: string | null
           amount: number
           category_id: string
           created_at?: string
@@ -111,6 +116,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          space_id?: string | null
           amount?: number
           category_id?: string
           created_at?: string
@@ -130,6 +136,7 @@ export type Database = {
       }
       categories: {
         Row: {
+          space_id: string | null
           archived_at: string | null
           color: string | null
           created_at: string
@@ -142,6 +149,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          space_id?: string | null
           archived_at?: string | null
           color?: string | null
           created_at?: string
@@ -154,6 +162,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          space_id?: string | null
           archived_at?: string | null
           color?: string | null
           created_at?: string
@@ -198,6 +207,7 @@ export type Database = {
       }
       recurring_rules: {
         Row: {
+          space_id: string | null
           auto_post: boolean
           created_at: string
           day_of_month: number | null
@@ -212,6 +222,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          space_id?: string | null
           auto_post?: boolean
           created_at?: string
           day_of_month?: number | null
@@ -226,6 +237,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          space_id?: string | null
           auto_post?: boolean
           created_at?: string
           day_of_month?: number | null
@@ -241,8 +253,93 @@ export type Database = {
         }
         Relationships: []
       }
+      space_invites: {
+        Row: {
+          created_at: string
+          created_by: string
+          expires_at: string
+          id: string
+          max_uses: number
+          revoked_at: string | null
+          role: string
+          space_id: string
+          token_hash: string
+          used_count: number
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string
+          expires_at: string
+          id?: string
+          max_uses?: number
+          revoked_at?: string | null
+          role: string
+          space_id: string
+          token_hash: string
+          used_count?: number
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          expires_at?: string
+          id?: string
+          max_uses?: number
+          revoked_at?: string | null
+          role?: string
+          space_id?: string
+          token_hash?: string
+          used_count?: number
+        }
+        Relationships: []
+      }
+      space_members: {
+        Row: {
+          created_at: string
+          role: string
+          space_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          role: string
+          space_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          role?: string
+          space_id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      spaces: {
+        Row: {
+          created_at: string
+          created_by: string
+          deleted_at: string | null
+          id: string
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string
+          deleted_at?: string | null
+          id?: string
+          name: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          deleted_at?: string | null
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
       transactions: {
         Row: {
+          space_id: string | null
           account_id: string
           amount: number
           category_id: string | null
@@ -262,6 +359,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          space_id?: string | null
           account_id: string
           amount: number
           category_id?: string | null
@@ -281,6 +379,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          space_id?: string | null
           account_id?: string
           amount?: number
           category_id?: string | null
@@ -350,6 +449,7 @@ export type Database = {
         Row: {
           account_id: string | null
           balance: number | null
+          space_id: string | null
           user_id: string | null
         }
         Relationships: []
@@ -359,13 +459,47 @@ export type Database = {
           expense: number | null
           income: number | null
           month: string | null
+          space_id: string | null
           user_id: string | null
         }
         Relationships: []
       }
     }
     Functions: {
-      [_ in never]: never
+      accept_space_invite: {
+        Args: { invite_token: string }
+        Returns: string
+      }
+      can_access_receipt_folder: {
+        Args: { folder: string; for_write: boolean }
+        Returns: boolean
+      }
+      create_space: {
+        Args: { space_name: string }
+        Returns: string
+      }
+      create_space_invite: {
+        Args: {
+          invite_role: string
+          sid: string
+          uses?: number
+          valid_hours?: number
+        }
+        Returns: string
+      }
+      list_space_members: {
+        Args: { sid: string }
+        Returns: {
+          email: string
+          is_you: boolean
+          role: string
+          user_id: string
+        }[]
+      }
+      space_role: {
+        Args: { sid: string }
+        Returns: string
+      }
     }
     Enums: {
       [_ in never]: never
