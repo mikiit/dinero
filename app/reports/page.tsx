@@ -1,11 +1,18 @@
 import { endOfMonth, format, parseISO, startOfMonth } from "date-fns";
 import { createClient } from "@/lib/supabase/server";
 import { getMonthlySeries, getSpendBreakdown } from "@/lib/db/reports";
+import { listCategories } from "@/lib/db/categories";
+import { listBudgets } from "@/lib/db/budgets";
+import { budgetProgress } from "@/lib/budgets";
 import { monthKey, parseMonthParam } from "@/lib/reports";
 import { MonthNav } from "@/components/reports/month-nav";
 import { MonthSummary } from "@/components/home/month-summary";
 import { CategorySpendChart } from "@/components/reports/category-spend";
 import { CashFlowChart } from "@/components/reports/cash-flow-chart";
+import {
+  BudgetProgressList,
+  type BudgetProgressRow,
+} from "@/components/reports/budget-progress";
 
 export default async function ReportsPage({
   searchParams,
@@ -34,9 +41,11 @@ export default async function ReportsPage({
   const requested = parseMonthParam(m);
   const month = requested && requested <= currentMonth ? requested : currentMonth;
 
-  const [series, spend] = await Promise.all([
+  const [series, spend, categories, budgets] = await Promise.all([
     getMonthlySeries(supabase, user.id, month),
     getSpendBreakdown(supabase, user.id, month),
+    listCategories(supabase, user.id),
+    listBudgets(supabase, user.id, month),
   ]);
   const selected = series[series.length - 1];
 
@@ -52,6 +61,35 @@ export default async function ReportsPage({
     return `/transactions?${params.toString()}`;
   });
 
+  const ctx = {
+    monthStartIso: month,
+    todayIso: format(new Date(), "yyyy-MM-dd"),
+  };
+  const spentById = new Map(
+    spend.items.flatMap((i) => (i.categoryId ? [[i.categoryId, i.total] as const] : [])),
+  );
+  const budgetRows: BudgetProgressRow[] = categories
+    .filter((c) => budgets.has(c.id))
+    .map((c) => ({
+      key: c.id,
+      name: c.name,
+      progress: budgetProgress(budgets.get(c.id)!, spentById.get(c.id) ?? 0n, ctx),
+    }));
+  // The total only compares budgeted categories, so unbudgeted spending
+  // (which has no limit to exceed) can't make it look overspent.
+  const totalRow: BudgetProgressRow | null =
+    budgetRows.length > 1
+      ? {
+          key: "total",
+          name: "Total budgeted",
+          progress: budgetProgress(
+            budgetRows.reduce((s, r) => s + r.progress.budget, 0n),
+            budgetRows.reduce((s, r) => s + r.progress.spent, 0n),
+            ctx,
+          ),
+        }
+      : null;
+
   return (
     <main className="mx-auto max-w-md space-y-6 p-4 lg:max-w-5xl lg:p-8">
       <h1 className="font-heading text-xl font-medium">Reports</h1>
@@ -59,6 +97,15 @@ export default async function ReportsPage({
       <MonthNav monthStartIso={month} currentMonthStartIso={currentMonth} />
 
       <MonthSummary income={selected.income} expense={selected.expense} />
+
+      <section className="space-y-3">
+        <h2 className="text-sm font-medium text-muted-foreground">Budgets</h2>
+        <BudgetProgressList
+          total={totalRow}
+          rows={budgetRows}
+          editHref={`/budgets?m=${monthKey(month)}`}
+        />
+      </section>
 
       <div className="grid gap-6 lg:grid-cols-2">
         <section className="space-y-3">

@@ -40,6 +40,11 @@ export default async function SettingsPage() {
               Categories
             </Link>
           </li>
+          <li>
+            <Link href="/budgets" className="block p-3 text-sm">
+              Budgets
+            </Link>
+          </li>
         </ul>
       </div>
 

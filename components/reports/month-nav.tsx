@@ -5,22 +5,28 @@ import { monthKey, shiftMonth } from "@/lib/reports";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-/** Prev/next month links for /reports. `?m=` is the only state, so the
- * selected month survives reloads and can be shared or bookmarked. */
+/** Prev/next month links for a page that takes `?m=`. That is the only
+ * state, so the selected month survives reloads and can be shared or
+ * bookmarked. */
 export function MonthNav({
   monthStartIso,
   currentMonthStartIso,
+  basePath = "/reports",
+  allowFuture = false,
 }: {
   monthStartIso: string;
   currentMonthStartIso: string;
+  basePath?: string;
+  /** Budgets can be planned ahead; reports have nothing to show there. */
+  allowFuture?: boolean;
 }) {
-  const isCurrent = monthStartIso >= currentMonthStartIso;
+  const isCurrent = !allowFuture && monthStartIso >= currentMonthStartIso;
   const iconButton = buttonVariants({ variant: "outline", size: "icon" });
 
   return (
     <div className="flex items-center justify-between gap-2">
       <Link
-        href={`/reports?m=${monthKey(shiftMonth(monthStartIso, -1))}`}
+        href={`${basePath}?m=${monthKey(shiftMonth(monthStartIso, -1))}`}
         aria-label="Previous month"
         className={iconButton}
       >
@@ -38,7 +44,7 @@ export function MonthNav({
         </span>
       ) : (
         <Link
-          href={`/reports?m=${monthKey(shiftMonth(monthStartIso, 1))}`}
+          href={`${basePath}?m=${monthKey(shiftMonth(monthStartIso, 1))}`}
           aria-label="Next month"
           className={iconButton}
         >
