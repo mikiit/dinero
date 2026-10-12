@@ -42,8 +42,24 @@ export default async function SettingsPage() {
         </ul>
       </div>
 
+      <div className="space-y-2">
+        <h2 className="text-sm font-medium text-muted-foreground">Data</h2>
+        <ul className="divide-y rounded-lg border">
+          <li>
+            {/* Plain anchor, not <Link>: it's a file download, not a page. */}
+            <a
+              href="/api/export/transactions"
+              download
+              className="block p-3 text-sm"
+            >
+              Export transactions (CSV)
+            </a>
+          </li>
+        </ul>
+      </div>
+
       <p className="text-sm text-muted-foreground">
-        Base currency and data export/import are coming in a later phase.
+        Base currency and CSV import are coming in a later phase.
       </p>
     </main>
   );
