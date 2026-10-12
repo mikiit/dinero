@@ -5,8 +5,15 @@
 
 export const RECEIPT_BUCKET = "receipts";
 
-/** Matches the bucket's own limit (supabase/migrations/*_receipts_bucket). */
+/** What is STORED: matches the bucket's own limit
+ * (supabase/migrations/*_receipts_bucket). */
 export const MAX_RECEIPT_BYTES = 5 * 1024 * 1024;
+
+/** What a user may PICK. Much larger than what is stored, because the photo
+ * is shrunk before upload and a current phone camera easily produces 8-15 MB
+ * originals; rejecting those up front would reject exactly the photos people
+ * take. Only a sanity cap so a huge file can't freeze the tab. */
+export const MAX_RECEIPT_INPUT_BYTES = 40 * 1024 * 1024;
 
 const EXTENSIONS: Record<string, string> = {
   "image/jpeg": "jpg",
@@ -50,14 +57,19 @@ export function isReceiptPathFor(
     pattern.test(path);
 }
 
-/** Null when the file is acceptable, otherwise a message for the user. */
-export function validateReceiptFile(file: { type: string; size: number }): string | null {
+/** Null when the file is acceptable, otherwise a message for the user.
+ * `maxBytes` defaults to the stored limit; the picker passes the larger
+ * input limit, and the prepared result is checked against the stored one. */
+export function validateReceiptFile(
+  file: { type: string; size: number },
+  maxBytes: number = MAX_RECEIPT_BYTES,
+): string | null {
   if (!RECEIPT_MIME_TYPES.includes(file.type)) {
     return "Choose a photo (JPEG, PNG, WebP or HEIC).";
   }
   if (file.size === 0) return "That file is empty.";
-  if (file.size > MAX_RECEIPT_BYTES) {
-    return "That photo is larger than 5 MB.";
+  if (file.size > maxBytes) {
+    return `That photo is larger than ${Math.round(maxBytes / (1024 * 1024))} MB.`;
   }
   return null;
 }

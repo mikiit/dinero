@@ -223,6 +223,17 @@ async function teardown(userId) {
 
   const admin = createClient(url, secretKey);
 
+  // Receipt photos live in Storage, not in a table the deletes below reach.
+  // Layout is <user>/<transaction>/<file>, so list one level, then the files.
+  const receipts = admin.storage.from("receipts");
+  const { data: folders } = await receipts.list(userId);
+  const paths = [];
+  for (const folder of folders ?? []) {
+    const { data: files } = await receipts.list(`${userId}/${folder.name}`);
+    for (const file of files ?? []) paths.push(`${userId}/${folder.name}/${file.name}`);
+  }
+  if (paths.length > 0) await receipts.remove(paths);
+
   await admin.from("budgets").delete().eq("user_id", userId);
   await admin.from("transactions").delete().eq("user_id", userId);
   await admin.from("recurring_rules").delete().eq("user_id", userId);

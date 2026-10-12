@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import {
   Sheet,
@@ -64,7 +64,13 @@ export function AddTransactionSheet({
   const [transactionId, setTransactionId] = useState(() => crypto.randomUUID());
   const [receiptPath, setReceiptPath] = useState<string | null>(null);
 
-  const mutation = useMutation({ mutationFn: createTransactionAction });
+  const queryClient = useQueryClient();
+  const mutation = useMutation({
+    mutationFn: createTransactionAction,
+    // Without this the Transactions list keeps showing its cached pages
+    // and the new entry only appears after a reload.
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ["transactions"] }),
+  });
 
   function validate(): string | null {
     if (!form.accountId) return "Choose an account.";

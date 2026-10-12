@@ -3,6 +3,7 @@
 import { createClient } from "@/lib/supabase/client";
 import {
   MAX_RECEIPT_BYTES,
+  MAX_RECEIPT_INPUT_BYTES,
   RECEIPT_BUCKET,
   RECEIPT_MAX_EDGE,
   buildReceiptPath,
@@ -16,12 +17,14 @@ export type PreparedReceipt = { blob: Blob; mimeType: string };
 /**
  * Shrinks a phone photo before upload: a modern camera shot is several MB,
  * a legible receipt is a few hundred KB at 1600px. Falls back to the
- * original file when the browser can't decode it (HEIC outside Safari) -
- * the server-side bucket limit still applies, so that can't smuggle in
- * something huge. Throws a user-facing Error on an unacceptable file.
+ * original file when the browser can't decode it (HEIC outside Safari), in
+ * which case the stored 5 MB limit applies to that original. Throws a
+ * user-facing Error on an unacceptable file.
  */
 export async function prepareReceiptImage(file: File): Promise<PreparedReceipt> {
-  const problem = validateReceiptFile(file);
+  // The picker limit is generous (the photo is about to be shrunk); the
+  // stored limit is enforced on whatever actually gets uploaded, below.
+  const problem = validateReceiptFile(file, MAX_RECEIPT_INPUT_BYTES);
   if (problem) throw new Error(problem);
 
   try {
@@ -42,12 +45,18 @@ export async function prepareReceiptImage(file: File): Promise<PreparedReceipt> 
       canvas.toBlob(resolve, "image/jpeg", 0.82),
     );
     // Keep whichever is smaller: re-encoding an already tiny image can grow it.
-    if (blob && blob.size < file.size) return { blob, mimeType: "image/jpeg" };
+    if (blob && blob.size < file.size && blob.size <= MAX_RECEIPT_BYTES) {
+      return { blob, mimeType: "image/jpeg" };
+    }
   } catch {
     // Not decodable here: fall through to the original.
   }
 
-  if (file.size > MAX_RECEIPT_BYTES) throw new Error("That photo is larger than 5 MB.");
+  if (file.size > MAX_RECEIPT_BYTES) {
+    throw new Error(
+      "That photo is too large and can't be shrunk in this browser. Try a smaller one.",
+    );
+  }
   return { blob: file, mimeType: file.type };
 }
 

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   MAX_RECEIPT_BYTES,
+  MAX_RECEIPT_INPUT_BYTES,
   buildReceiptPath,
   extensionFor,
   isReceiptPathFor,
@@ -48,6 +49,15 @@ describe("extensionFor / validateReceiptFile", () => {
     expect(validateReceiptFile({ type: "image/png", size: MAX_RECEIPT_BYTES + 1 })).toMatch(/5 MB/);
     expect(validateReceiptFile({ type: "application/pdf", size: 1000 })).toMatch(/photo/);
     expect(validateReceiptFile({ type: "image/jpeg", size: 0 })).toMatch(/empty/);
+  });
+
+  it("lets a large phone original be picked, since it is shrunk before upload", () => {
+    const eightMb = { type: "image/jpeg", size: 8 * 1024 * 1024 };
+    expect(validateReceiptFile(eightMb)).toMatch(/5 MB/); // not storable as is
+    expect(validateReceiptFile(eightMb, MAX_RECEIPT_INPUT_BYTES)).toBeNull();
+    expect(
+      validateReceiptFile({ type: "image/jpeg", size: MAX_RECEIPT_INPUT_BYTES + 1 }, MAX_RECEIPT_INPUT_BYTES),
+    ).toMatch(/40 MB/);
   });
 });
 
