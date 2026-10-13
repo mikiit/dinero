@@ -4,6 +4,7 @@ import { ThemeToggle } from "@/components/settings/theme-toggle";
 import { AccountSection } from "@/components/settings/account-section";
 import { ImportSection } from "@/components/settings/import-section";
 import { InstallApp } from "@/components/pwa/install-app";
+import { DeleteAccount } from "@/components/settings/delete-account";
 import { getContext } from "@/lib/context";
 
 export default async function SettingsPage() {
@@ -86,9 +87,22 @@ export default async function SettingsPage() {
         {canWrite && <ImportSection />}
       </div>
 
-      <p className="text-sm text-muted-foreground">
-        Base currency is coming in a later phase.
-      </p>
+      <div className="space-y-2">
+        <h2 className="text-sm font-medium text-muted-foreground">Privacy</h2>
+        <div className="space-y-3 rounded-lg border p-3">
+          <p className="text-sm">
+            <Link href="/privacy" className="underline underline-offset-4">
+              Privacy Policy
+            </Link>
+          </p>
+          <div className="space-y-1.5">
+            <p className="text-xs text-muted-foreground">
+              Erase your account and everything in it.
+            </p>
+            <DeleteAccount />
+          </div>
+        </div>
+      </div>
     </main>
   );
 }

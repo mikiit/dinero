@@ -96,6 +96,24 @@ export type Database = {
         }
         Relationships: []
       }
+      invite_attempts: {
+        Row: {
+          at: string
+          id: number
+          user_id: string
+        }
+        Insert: {
+          at?: string
+          id?: never
+          user_id: string
+        }
+        Update: {
+          at?: string
+          id?: never
+          user_id?: string
+        }
+        Relationships: []
+      }
       budgets: {
         Row: {
           currency: string
@@ -475,7 +493,11 @@ export type Database = {
     Functions: {
       accept_space_invite: {
         Args: { invite_token: string }
-        Returns: string
+        Returns: string | null
+      }
+      account_deletion_check: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
       }
       can_access_receipt_folder: {
         Args: { folder: string; for_write: boolean }
@@ -484,6 +506,10 @@ export type Database = {
       create_space: {
         Args: { space_name: string }
         Returns: string
+      }
+      delete_my_account: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
       }
       create_space_invite: {
         Args: {

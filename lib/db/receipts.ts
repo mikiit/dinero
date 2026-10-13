@@ -94,3 +94,45 @@ export async function removeReceipt(
 
   await removeObject(supabase, previous);
 }
+
+type ReceiptBucket = ReturnType<SupabaseClient<Database>["storage"]["from"]>;
+
+/** Every file under `prefix`, descending into the per-transaction folders
+ * (receipts live at "<owner>/<transaction>/<file>"). Paged: a listing returns
+ * at most 100 entries at a time. */
+async function listAllFiles(bucket: ReceiptBucket, prefix: string): Promise<string[]> {
+  const PAGE = 100;
+  const files: string[] = [];
+  for (let offset = 0; ; offset += PAGE) {
+    const { data, error } = await bucket.list(prefix, { limit: PAGE, offset });
+    if (error) throw error;
+    for (const entry of data) {
+      // A folder has no id; a file does.
+      if (entry.id === null) {
+        files.push(...(await listAllFiles(bucket, `${prefix}/${entry.name}`)));
+      } else {
+        files.push(`${prefix}/${entry.name}`);
+      }
+    }
+    if (data.length < PAGE) break;
+  }
+  return files;
+}
+
+/**
+ * Deletes every receipt photo in one owner folder (a user id or a space id).
+ * Unlike removeObject this is NOT best effort: it is part of erasing an
+ * account, so a failure must stop that rather than leave photos behind.
+ */
+export async function removeReceiptFolder(
+  supabase: SupabaseClient<Database>,
+  folder: string,
+): Promise<number> {
+  const bucket = supabase.storage.from(RECEIPT_BUCKET);
+  const files = await listAllFiles(bucket, folder);
+  for (let i = 0; i < files.length; i += 100) {
+    const { error } = await bucket.remove(files.slice(i, i + 100));
+    if (error) throw error;
+  }
+  return files.length;
+}

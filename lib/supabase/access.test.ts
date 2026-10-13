@@ -34,9 +34,18 @@ describe("decideAccess", () => {
     }
   });
 
+  it("keeps the Privacy Policy readable without a login", () => {
+    for (const user of [null, ANON, REAL]) {
+      expect(decideAccess("/privacy", user, true)).toBe("allow");
+    }
+    expect(decideAccess("/privacy/anything", null, true)).toBe("login");
+  });
+
   it("only opens the dev test-login tool outside production", () => {
     expect(decideAccess("/api/dev/test-session", null, false)).toBe("allow");
     expect(decideAccess("/api/dev/test-session", null, true)).toBe("unauthorized");
+    // Even for a signed-in person it is never a public path in production.
+    expect(decideAccess("/api/dev/test-session", ANON, true)).toBe("unauthorized");
   });
 
   it("is not fooled by paths that merely start like a public one", () => {

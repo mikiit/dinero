@@ -9,12 +9,14 @@ export type AccessDecision =
   /** A data endpoint: answer 401 rather than redirect to an HTML page. */
   | "unauthorized";
 
-/** Reachable without being signed in: the login screen itself and the
- * OAuth/email-confirmation callback it depends on. (The manifest, service
+/** Reachable without being signed in: the login screen itself, the
+ * OAuth/email-confirmation callback it depends on, and the Privacy Policy
+ * (people read it before they create an account). (The manifest, service
  * worker, offline page and icons never reach this check - they are excluded
  * from the proxy matcher, so the browser can fetch them without cookies.) */
 function isPublicPath(pathname: string, isProduction: boolean): boolean {
   if (pathname === "/login") return true;
+  if (pathname === "/privacy") return true;
   if (pathname === "/auth/callback" || pathname.startsWith("/auth/")) return true;
   // Dev-only tooling that logs a browser tab in as a test user; the route
   // itself 404s in production, this just stops the gate from blocking it

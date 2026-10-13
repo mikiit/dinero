@@ -27,6 +27,13 @@ describe.skipIf(!hasCredentials)("shared spaces (live, SPEC.md P4)", () => {
   const stamp = Date.now();
   const PW = "spaces-test-pw-1";
   const hashOf = (token: string) => createHash("sha256").update(token).digest("hex");
+  // A bad invite (unknown, expired, used up, revoked) is answered with null and
+  // no error - one answer for all of them, and the failure can be recorded for
+  // throttling (see 20261013120000).
+  const expectRefused = (res: { data: unknown; error: unknown }) => {
+    expect(res.error).toBeNull();
+    expect(res.data).toBeNull();
+  };
 
   async function user(tag: string): Promise<{ client: Db; id: string }> {
     const email = `sp-${tag}-${stamp}@example.com`;
@@ -288,11 +295,11 @@ describe.skipIf(!hasCredentials)("shared spaces (live, SPEC.md P4)", () => {
 
     expect((await A.rpc("accept_space_invite", { invite_token: token })).data).toBe(space);
     const second = await B.rpc("accept_space_invite", { invite_token: token });
-    expect(second.error?.message).toBe("This invite is not valid.");
+    expectRefused(second);
     expect(await count(B, "accounts", spaceAccount)).toBe(0);
 
     const garbage = await B.rpc("accept_space_invite", { invite_token: "definitely-not-a-token" });
-    expect(garbage.error?.message).toBe("This invite is not valid."); // same words
+    expectRefused(garbage); // same answer
 
     // The first user is a viewer, with exactly the invited role.
     expect((await admin.from("space_members").select("role").eq("space_id", space).eq("user_id", uA).single()).data?.role).toBe("viewer");
@@ -307,9 +314,7 @@ describe.skipIf(!hasCredentials)("shared spaces (live, SPEC.md P4)", () => {
       .from("space_invites")
       .update({ expires_at: new Date(Date.now() - 1000).toISOString() })
       .eq("token_hash", hashOf(expired));
-    expect((await A.rpc("accept_space_invite", { invite_token: expired })).error?.message).toBe(
-      "This invite is not valid.",
-    );
+    expectRefused(await A.rpc("accept_space_invite", { invite_token: expired }));
 
     const revoked = (await O.rpc("create_space_invite", { sid: space, invite_role: "viewer" })).data!;
     const revokedByOwner = await O.from("space_invites")
@@ -317,9 +322,7 @@ describe.skipIf(!hasCredentials)("shared spaces (live, SPEC.md P4)", () => {
       .eq("token_hash", hashOf(revoked))
       .select("id");
     expect(revokedByOwner.data).toHaveLength(1);
-    expect((await B.rpc("accept_space_invite", { invite_token: revoked })).error?.message).toBe(
-      "This invite is not valid.",
-    );
+    expectRefused(await B.rpc("accept_space_invite", { invite_token: revoked }));
   }, 90000);
 
   it("a multi-use invite stops at its limit", async () => {
@@ -327,9 +330,7 @@ describe.skipIf(!hasCredentials)("shared spaces (live, SPEC.md P4)", () => {
     const token = (await O.rpc("create_space_invite", { sid: space, invite_role: "viewer", uses: 2 })).data!;
     expect((await people[0].client.rpc("accept_space_invite", { invite_token: token })).error).toBeNull();
     expect((await people[1].client.rpc("accept_space_invite", { invite_token: token })).error).toBeNull();
-    expect((await people[2].client.rpc("accept_space_invite", { invite_token: token })).error?.message).toBe(
-      "This invite is not valid.",
-    );
+    expectRefused(await people[2].client.rpc("accept_space_invite", { invite_token: token }));
   }, 90000);
 
   it("only owners can see or revoke invites, and viewers can't mint them", async () => {
@@ -392,9 +393,7 @@ describe.skipIf(!hasCredentials)("shared spaces (live, SPEC.md P4)", () => {
       expect(await count(c, "accounts", spaceAccount)).toBe(0);
       expect(await count(c, "transactions", spaceTx)).toBe(0);
     }
-    expect((await late.rpc("accept_space_invite", { invite_token: token })).error?.message).toBe(
-      "This invite is not valid.",
-    );
+    expectRefused(await late.rpc("accept_space_invite", { invite_token: token }));
 
     // Restore so afterAll's cleanup sees the space the way it was.
     await admin.from("spaces").update({ deleted_at: null }).eq("id", space);

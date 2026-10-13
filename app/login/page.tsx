@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { GoogleAuthButtons } from "@/components/auth/google-auth-buttons";
@@ -73,6 +74,12 @@ export default async function LoginPage({
       ) : (
         <SignInPanel next={next} />
       )}
+
+      <p className="text-center text-xs text-muted-foreground">
+        <Link href="/privacy" className="underline underline-offset-4">
+          Privacy Policy
+        </Link>
+      </p>
     </main>
   );
 }
