@@ -4,10 +4,15 @@ import { DEFAULT_CATEGORIES } from "./default-categories";
 import { scopeColumns, scopeFilter, type Scope } from "@/lib/scope";
 
 // A first page load asks for categories from the layout AND the page at the
-// same moment. Both see "none yet" and, without this, both insert the full
-// default set - a new account ended up with every category twice. Sharing
-// the in-flight promise makes the second caller wait for the first.
+// same moment. This map only dedupes callers inside ONE process (cheap, saves
+// a round trip); across serverless instances the unique index on categories
+// (20261013150000_categories_unique_active) is what guarantees one set, and
+// insertMissingDefaults tolerates losing that race.
 const inFlight = new Map<string, Promise<void>>();
+
+// Postgres unique_violation.
+const UNIQUE_VIOLATION = "23505";
+const MAX_ATTEMPTS = 3;
 
 /**
  * Inserts the default category set (SPEC.md Phase 0) for a ledger, skipping
@@ -30,42 +35,51 @@ export function seedDefaultCategories(
   return job;
 }
 
-async function insertMissingDefaults(
+export async function insertMissingDefaults(
   supabase: SupabaseClient<Database>,
   scope: Scope,
 ): Promise<void> {
-  const { data: existing, error: fetchError } = await supabase
-    .from("categories")
-    .select("name, kind")
-    .filter(...scopeFilter(scope))
-    .is("archived_at", null);
+  // A unique violation means another instance inserted some of the same
+  // defaults between our read and our insert. The batch is all-or-nothing, so
+  // re-read and insert only what is still missing.
+  for (let attempt = 1; ; attempt++) {
+    const { data: existing, error: fetchError } = await supabase
+      .from("categories")
+      .select("name, kind")
+      .filter(...scopeFilter(scope))
+      .is("archived_at", null)
+      .is("parent_id", null);
 
-  if (fetchError) {
-    throw fetchError;
-  }
+    if (fetchError) {
+      throw fetchError;
+    }
 
-  const existingKeys = new Set(
-    (existing ?? []).map((c) => `${c.kind}:${c.name}`),
-  );
+    const existingKeys = new Set(
+      (existing ?? []).map((c) => `${c.kind}:${c.name}`),
+    );
 
-  const toInsert = DEFAULT_CATEGORIES.filter(
-    (c) => !existingKeys.has(`${c.kind}:${c.name}`),
-  ).map((c) => ({
-    ...scopeColumns(scope),
-    name: c.name,
-    kind: c.kind,
-    sort_order: c.sortOrder,
-  }));
+    const toInsert = DEFAULT_CATEGORIES.filter(
+      (c) => !existingKeys.has(`${c.kind}:${c.name}`),
+    ).map((c) => ({
+      ...scopeColumns(scope),
+      name: c.name,
+      kind: c.kind,
+      sort_order: c.sortOrder,
+    }));
 
-  if (toInsert.length === 0) {
-    return;
-  }
+    if (toInsert.length === 0) {
+      return;
+    }
 
-  const { error: insertError } = await supabase
-    .from("categories")
-    .insert(toInsert);
+    const { error: insertError } = await supabase
+      .from("categories")
+      .insert(toInsert);
 
-  if (insertError) {
-    throw insertError;
+    if (!insertError) {
+      return;
+    }
+    if (insertError.code !== UNIQUE_VIOLATION || attempt >= MAX_ATTEMPTS) {
+      throw insertError;
+    }
   }
 }
