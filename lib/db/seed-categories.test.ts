@@ -2,6 +2,7 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { Database } from "@/lib/database.types";
 import { listCategories } from "./categories";
+import { insertMissingDefaults } from "./seed-categories";
 import { DEFAULT_CATEGORIES } from "./default-categories";
 import { loadTestEnv, signInAnonymouslyWithRetry } from "./test-env";
 import { personalScope } from "@/lib/scope";
@@ -54,5 +55,43 @@ describe.skipIf(!hasCredentials)("default category seeding (live)", () => {
     const scope = personalScope(userId);
     const again = await listCategories(client, scope);
     expect(again).toHaveLength(DEFAULT_CATEGORIES.length);
+  }, 60000);
+
+  // The in-process dedupe in seedDefaultCategories cannot help across
+  // serverless instances, so this calls insertMissingDefaults directly from
+  // two independent clients (each its own connection, no shared in-flight
+  // map) and relies on the database unique index alone. Needs migration
+  // 20261013150000_categories_unique_active applied to the test project.
+  it("seeds each default exactly once when two separate clients race", async () => {
+    const { data: sessionData } = await client.auth.getSession();
+    const token = sessionData.session?.access_token;
+    expect(token).toBeTruthy();
+
+    const other = createClient<Database>(url!, anonKey!, {
+      global: { headers: { Authorization: `Bearer ${token}` } },
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+
+    // Start from a clean slate for this user.
+    await admin.from("categories").delete().eq("user_id", userId);
+
+    const scope = personalScope(userId);
+    await Promise.all([
+      insertMissingDefaults(client, scope),
+      insertMissingDefaults(other, scope),
+      insertMissingDefaults(client, scope),
+      insertMissingDefaults(other, scope),
+    ]);
+
+    const { data } = await admin
+      .from("categories")
+      .select("name, kind")
+      .eq("user_id", userId);
+    expect(data).toHaveLength(DEFAULT_CATEGORIES.length);
+    const keys = new Set((data ?? []).map((r) => `${r.kind}:${r.name}`));
+    expect(keys.size).toBe(DEFAULT_CATEGORIES.length);
+    for (const c of DEFAULT_CATEGORIES) {
+      expect(keys.has(`${c.kind}:${c.name}`)).toBe(true);
+    }
   }, 60000);
 });
